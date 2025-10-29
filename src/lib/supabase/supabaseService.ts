@@ -53,12 +53,12 @@ class SupabaseService {
           .eq('phone', emailOrPhone)
           .single();
         
-        if (queryError || !profile || !profile.email) {
+        if (queryError || !profile || !(profile as UserProfile).email) {
           console.error('❌ 手机号未注册或未绑定邮箱:', emailOrPhone);
           throw new Error('该手机号未注册');
         }
         
-        loginEmail = profile.email;
+        loginEmail = (profile as UserProfile).email!;
         console.log('✅ 找到对应邮箱:', loginEmail);
       }
       
@@ -177,8 +177,8 @@ class SupabaseService {
         return null;
       }
       
-      console.log('✅ 用户资料查询成功:', data.name, data.role);
-      return data;
+      console.log('✅ 用户资料查询成功:', (data as UserProfile).name, (data as UserProfile).role);
+      return data as UserProfile;
     } catch (error) {
       const supabaseError = handleSupabaseError(error);
       console.error('❌ getUserProfile 异常:', supabaseError.message);
@@ -247,7 +247,7 @@ class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .insert(customer as any)
+        .insert([customer] as any)
         .select()
         .single();
 
