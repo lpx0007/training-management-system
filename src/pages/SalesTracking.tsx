@@ -164,6 +164,15 @@ export default function SalesTracking() {
         currentPath="/sales-tracking"
       />
 
+      {/* 移动端透明遮罩层 - 点击关闭侧边栏 */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-transparent z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* 主内容区域 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶部导航栏 */}
