@@ -50,21 +50,13 @@ export async function getSalesPersonsData(timeRange: string = '本月'): Promise
       return [];
     }
     
-    // 2. 获取salespersons表
-    const { data: salespersonsTable } = await supabase
-      .from('salespersons')
-      .select('*');
-    
-    // 3. 合并数据
+    // 2. 直接使用 user_profiles 数据（salespersons 表已废弃）
     const salespersons = userProfiles.map((profile: any) => {
-      const record = (salespersonsTable as any[] || []).find(
-        (s: any) => s.user_id === profile.id
-      ) as any;
       return {
         ...profile,
-        salesperson_id: record?.id,
-        department: record?.department,
-        avatar: record?.avatar
+        salesperson_id: profile.id, // 使用 user_profiles 的 id
+        department: profile.department,
+        avatar: profile.avatar
       };
     });
     
