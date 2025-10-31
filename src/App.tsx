@@ -341,7 +341,7 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/training-performance" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
             <TrainingPerformance />
           </ProtectedRoute>
         } />

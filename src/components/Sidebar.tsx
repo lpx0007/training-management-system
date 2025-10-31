@@ -55,7 +55,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath }: SidebarProps) => 
   // 统一的导航菜单配置，包含权限控制
   const navItems: NavItem[] = [
     { icon: <BarChart2 size={20} />, label: '仪表盘', path: '/dashboard', permission: ['admin', 'salesperson', 'expert'] },
-    { icon: <Calendar size={20} />, label: '培训计划', path: '/training-performance', permission: ['admin', 'salesperson'] },
+    { icon: <Calendar size={20} />, label: '培训计划', path: '/training-performance', permission: ['admin', 'salesperson', 'expert'] },
     { icon: <UserCheck size={20} />, label: '专家管理', path: '/expert-management', permission: ['admin'] },
     { icon: <DollarSign size={20} />, label: '销售追踪', path: '/sales-tracking', permission: ['admin'] },
     { icon: <Users size={20} />, label: '客户管理', path: '/customer-management', permission: ['admin', 'salesperson'] },
