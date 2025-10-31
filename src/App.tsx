@@ -64,7 +64,8 @@ export default function App() {
                 username: session.user.email || 'user',
                 role: 'salesperson', // 默认角色
                 name: session.user.email?.split('@')[0] || '用户',
-                department: undefined
+                department: undefined,
+                avatar: undefined
               };
               setUser(tempUser);
               setIsAuthenticated(true);
@@ -168,6 +169,7 @@ export default function App() {
           role: profile.role,
           name: profile.name,
           department: profile.department || undefined,
+          avatar: profile.avatar || undefined,
         };
         
         setUser(userData);
