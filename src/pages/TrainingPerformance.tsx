@@ -8,6 +8,7 @@ import { useState, useContext, useEffect } from 'react';
   import type { TrainingSessionFrontend, Course, Customer, Expert } from '@/lib/supabase/types';
   import { toast } from 'sonner';
   import { exportAllAttendanceSheet, exportAttendanceSheetBySalesperson } from '@/lib/exporters/attendanceSheetExporter';
+  import { generateDefaultAvatar } from '@/utils/imageUtils';
 
 export default function TrainingPerformance() {
   const location = useLocation();
@@ -231,15 +232,53 @@ export default function TrainingPerformance() {
   const openDetailModal = async (session: TrainingSessionFrontend) => {
     console.log('🔍 点击详情，培训ID:', session.id);
     console.log('🔍 当前培训数据:', session);
+    console.log('🔍 当前用户角色:', user?.role);
+    
     try {
-      // 重新获取完整的培训信息，包括参与者列表
-      // 如果是业务员，只加载该业务员的客户
+      // 如果是专家角色，直接使用当前 session 数据，不需要加载参与者列表
+      if (user?.role === 'expert') {
+        console.log('👨‍🏫 专家角色：使用简化版详情');
+        setSelectedSession(session);
+        
+        // 加载专家详细信息
+        if (session.expertId) {
+          try {
+            const experts = await supabaseService.getExperts();
+            const expert = experts.find(e => e.id === session.expertId);
+            if (expert) {
+              setSelectedExpertDetail(expert);
+            }
+          } catch (error) {
+            console.error('获取专家信息失败:', error);
+          }
+        }
+        
+        setIsDetailModalOpen(true);
+        console.log('✅ 专家详情模态框已打开');
+        return;
+      }
+      
+      // 管理员和业务员需要获取完整的培训信息，包括参与者列表
       const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
       console.log('📡 正在获取完整培训信息...', { salespersonName });
       const fullSession = await supabaseService.getTrainingSessionById(session.id, salespersonName);
       console.log('✅ 获取到完整培训信息:', fullSession);
       if (fullSession) {
         setSelectedSession(fullSession);
+        
+        // 同时加载专家详细信息
+        if (fullSession.expertId) {
+          try {
+            const experts = await supabaseService.getExperts();
+            const expert = experts.find(e => e.id === fullSession.expertId);
+            if (expert) {
+              setSelectedExpertDetail(expert);
+            }
+          } catch (error) {
+            console.error('获取专家信息失败:', error);
+          }
+        }
+        
         setIsDetailModalOpen(true);
         console.log('✅ 详情模态框已打开');
       } else {
@@ -1688,21 +1727,32 @@ export default function TrainingPerformance() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                     <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-3">专家信息</h4>
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                        <UserCheck size={24} className="text-blue-500 dark:text-blue-400" />
-                      </div>
-                      <div className="ml-3">
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={selectedExpertDetail?.avatar || generateDefaultAvatar(selectedSession.expert, 96)}
+                        alt={selectedSession.expert}
+                        className="flex-shrink-0 h-12 w-12 rounded-full object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
                         <div 
-                          className="text-sm font-medium text-blue-600 dark:text-blue-400 cursor-pointer"
+                          className="text-sm font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
                           onClick={() => selectedSession.expertId && openExpertDetail(selectedSession.expertId)}
                         >
                           {selectedSession.expert}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">专家ID: {selectedSession.expertId}</div>
+                        {selectedExpertDetail?.title && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {selectedExpertDetail.title}
+                          </div>
+                        )}
+                        {selectedExpertDetail?.bio && (
+                          <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                            {selectedExpertDetail.bio}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1714,26 +1764,26 @@ export default function TrainingPerformance() {
                         <span className="text-sm text-gray-600 dark:text-gray-400">容纳人数</span>
                         <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.capacity || 30}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">已报名人数</span>
-                        {/* 显示总的报名人数（所有业务员的客户） */}
-                        <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.participants || 0}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">缺口人数</span>
-                        {/* 缺口 = 容纳人数 - 总报名人数 */}
-                        <span className="text-sm font-medium text-gray-800 dark:text-white">{Math.max(0, (selectedSession.capacity || 30) - (selectedSession.participants || 0))}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">销售额</span>
-                        <span className="text-sm font-medium text-gray-800 dark:text-white">
-                          {selectedSession.revenue != null ? `¥${selectedSession.revenue.toLocaleString()}` : '暂无'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">评分</span>
-                        <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.rating || '暂无'}</span>
-                      </div>
+                      {/* 专家角色只显示预计参训人数，不显示详细的报名和缺口信息 */}
+                      {user?.role === 'expert' ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">预计参训人数</span>
+                          <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.participants || 0}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">已报名人数</span>
+                            {/* 显示总的报名人数（所有业务员的客户） */}
+                            <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.participants || 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">缺口人数</span>
+                            {/* 缺口 = 容纳人数 - 总报名人数 */}
+                            <span className="text-sm font-medium text-gray-800 dark:text-white">{Math.max(0, (selectedSession.capacity || 30) - (selectedSession.participants || 0))}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1752,10 +1802,13 @@ export default function TrainingPerformance() {
                           {selectedSession.status === 'completed' ? '已完成' : selectedSession.status === 'upcoming' ? '即将开始' : '进行中'}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">负责人</span>
-                        <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.salespersonName || '未分配'}</span>
-                      </div>
+                      {/* 专家角色不显示负责人信息 */}
+                      {user?.role !== 'expert' && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">负责人</span>
+                          <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.salespersonName || '未分配'}</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600 dark:text-gray-400">对应课程</span>
                         <span className="text-sm font-medium text-gray-800 dark:text-white">{getCourseName(selectedSession.courseId || undefined)}</span>
@@ -1764,7 +1817,8 @@ export default function TrainingPerformance() {
                   </div>
                 </div>
 
-                {selectedSession.participantsList && selectedSession.participantsList.length > 0 && (
+                {/* 专家角色不显示参训人员详细信息 */}
+                {user?.role !== 'expert' && selectedSession.participantsList && selectedSession.participantsList.length > 0 && (
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                     <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
                       参训人员 ({selectedSession.participantsList.length})

@@ -195,6 +195,27 @@ pnpm build
 5. **性能优化**: 实现组件懒加载和代码分割
 6. **移动端适配**: 增强移动端用户体验
 
+## 📚 详细文档
+
+本 README 提供了项目的基本概述。如需更详细的技术文档，请访问：
+
+### 📖 [文档中心](./docs/README.md)
+
+文档中心包含：
+- **[项目完整文档](./docs/PROJECT_DOCUMENTATION.md)** - 完整的技术文档和开发指南
+- **[UI 设计指南](./docs/UI_DESIGN_GUIDE.md)** - 详细的设计规范和组件库
+- **[Supabase 快速入门](./docs/SUPABASE_QUICKSTART.md)** - Supabase 配置和部署指南
+
+### 🚀 快速链接
+
+- [本地开发环境设置](./docs/PROJECT_DOCUMENTATION.md#本地开发)
+- [Netlify 部署指南](./docs/PROJECT_DOCUMENTATION.md#netlify-部署)
+- [API 参考文档](./docs/PROJECT_DOCUMENTATION.md#api-参考)
+- [故障排查指南](./docs/PROJECT_DOCUMENTATION.md#故障排查)
+- [常见问题 FAQ](./docs/PROJECT_DOCUMENTATION.md#常见问题-faq)
+
+---
+
 ## 联系与支持
 
 如有任何问题或需要进一步的支持，请联系项目维护团队。

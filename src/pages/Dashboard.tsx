@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import Sidebar from '@/components/Sidebar';
 import supabaseService from '@/lib/supabase/supabaseService';
-import type { TrainingSession } from '@/lib/supabase/types';
+import type { TrainingSessionFrontend } from '@/lib/supabase/types';
 import NotificationBell from '@/components/Notifications/NotificationBell';
 import AnnouncementBanner from '@/components/Announcements/AnnouncementBanner';
 
@@ -53,7 +53,7 @@ export default function Dashboard() {
   const { user, logout } = useContext(AuthContext);
   const { theme, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [trainingSessions, setTrainingSessions] = useState<TrainingSession[]>([]);
+  const [trainingSessions, setTrainingSessions] = useState<TrainingSessionFrontend[]>([]);
   const location = useLocation();
   // 从 Supabase 获取培训场次
   useEffect(() => {
@@ -167,26 +167,54 @@ export default function Dashboard() {
                 {expertTrainingSchedule.length > 0 ? (
                   <div className="space-y-4">
                     {expertTrainingSchedule.map(training => (
-                      <div key={training.id} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                          <GraduationCap size={24} />
-                        </div>
-                        <div className="ml-4 flex-1">
-                          <h4 className="text-base font-medium text-gray-800 dark:text-white">{training.name}</h4>
-                          <div className="flex items-center mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            <Calendar size={16} className="mr-2 flex-shrink-0" />
-                            <span>{training.date}</span>
-                            <span className="mx-3">•</span>
-                            <span>{training.participants} 人参加</span>
+                      <div key={training.id} className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start flex-1">
+                            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                              <GraduationCap size={24} />
+                            </div>
+                            <div className="ml-4 flex-1">
+                              <h4 className="text-base font-medium text-gray-800 dark:text-white mb-2">{training.name}</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                <div className="flex items-center">
+                                  <Calendar size={14} className="mr-2 flex-shrink-0 text-gray-400" />
+                                  <span>{training.date}</span>
+                                  {training.startTime && (
+                                    <span className="ml-2">{training.startTime} - {training.endTime}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center">
+                                  <Users size={14} className="mr-2 flex-shrink-0 text-gray-400" />
+                                  <span>{training.participants} / {training.capacity || 30} 人</span>
+                                </div>
+                                {training.area && (
+                                  <div className="flex items-center md:col-span-2">
+                                    <svg className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span>{training.area}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 ml-4">
+                            <span className={`px-3 py-1 rounded-full text-sm whitespace-nowrap ${
+                              training.status === 'completed' 
+                                ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400' 
+                                : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-400'
+                            }`}>
+                              {training.status === 'completed' ? '已完成' : '即将开始'}
+                            </span>
+                            <Link
+                              to="/training-performance"
+                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              查看详情 →
+                            </Link>
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm ${
-                          training.status === 'completed' 
-                            ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400' 
-                            : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-400'
-                        }`}>
-                          {training.status === 'completed' ? '已完成' : '即将开始'}
-                        </span>
                       </div>
                     ))}
                   </div>

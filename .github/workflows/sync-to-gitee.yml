@@ -1,0 +1,44 @@
+name: Sync to Gitee
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    name: 同步代码到 Gitee
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 获取完整历史记录
+
+      - name: 同步到 Gitee
+        uses: wearerequired/git-mirror-action@v1
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+        with:
+          source-repo: https://github.com/${{ github.repository }}.git
+          destination-repo: git@gitee.com:lpx007/training-management.git
+
+      - name: 同步成功通知
+        if: success()
+        run: |
+          echo "✅ 成功同步到 Gitee"
+          echo "📦 仓库: https://gitee.com/lpx007/training-management"
+          echo "🚀 EdgeOne 将自动开始部署"
+          echo "⏰ 时间: $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: 同步失败通知
+        if: failure()
+        run: |
+          echo "❌ 同步到 Gitee 失败"
+          echo "🔍 请检查以下配置："
+          echo "   1. GitHub Secret: GITEE_PRIVATE_KEY 是否正确"
+          echo "   2. Gitee 部署公钥是否已添加"
+          echo "   3. Gitee 部署公钥是否勾选了'允许推送'"
+          echo "   4. 仓库地址是否正确"
