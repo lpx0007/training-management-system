@@ -113,6 +113,7 @@ export interface TrainingSession {
   expert: string;
   expertId: number;
   area: string;
+  detailedAddress?: string | null;
   revenue: number;
   status: string;
   rating: number;

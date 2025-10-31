@@ -123,6 +123,7 @@ export interface TrainingSession {
   expert_id: number | null;
   expert_name: string | null;
   area: string | null;
+  detailed_address: string | null;
   revenue: number | null;
   status: string | null;
   rating: number | null;
@@ -134,12 +135,13 @@ export interface TrainingSession {
 }
 
 // 培训场次（前端友好类型，包含驼峰命名字段）
-export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'start_time' | 'end_time' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_description' | 'created_at'> {
+export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'start_time' | 'end_time' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_description' | 'created_at' | 'detailed_address'> {
   expertId: number | null;
   expert: string;
   startTime: string;
   endTime: string;
   endDate: string | null;
+  detailedAddress: string | null;
   salespersonId: string | null;  // 改为 UUID
   salespersonName: string | null;
   courseId: string | null;
@@ -235,6 +237,7 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     expertId: dbSession.expert_id,
     expert: dbSession.expert_name || '未指定',
     area: dbSession.area || '未指定',
+    detailedAddress: dbSession.detailed_address,
     revenue: dbSession.revenue,
     status: dbSession.status,
     rating: dbSession.rating,

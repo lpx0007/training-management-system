@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from 'react';
   import { AuthContext } from '@/contexts/authContext';
   import { useLocation } from 'react-router-dom';
-  import { Calendar, Filter, Search, ChevronDown, Users, Clock, UserCheck, MapPin, GraduationCap, Plus } from 'lucide-react';
+  import { Calendar, Filter, Search, ChevronDown, Users, Clock, UserCheck, MapPin, GraduationCap, Plus, ExternalLink } from 'lucide-react';
   import { Empty } from '@/components/Empty';
   import Sidebar from '@/components/Sidebar';
   import supabaseService from '@/lib/supabase/supabaseService';
@@ -436,6 +436,7 @@ export default function TrainingPerformance() {
       const startTime = formData.get('startTime') as string;
       const endTime = formData.get('endTime') as string;
       const area = formData.get('area') as string;
+      const detailedAddress = formData.get('detailedAddress') as string;
       const status = formData.get('status') as string;
       const salespersonId = formData.get('salespersonId') as string;
       const capacity = parseInt(formData.get('capacity') as string) || 30;
@@ -537,10 +538,11 @@ export default function TrainingPerformance() {
         expert_id: expertId,
         expert_name: expert.name,
         area: area || null,
+        detailed_address: detailedAddress || null,
         status: status || null,
         course_id: null,
         course_description: courseDescription || null,
-        salesperson_id: salespersonId ? parseInt(salespersonId) : null
+        salesperson_id: salespersonId || null
       };
       
       console.log('💾 准备更新到数据库的数据:', updateData);
@@ -593,6 +595,7 @@ export default function TrainingPerformance() {
       const startTime = formData.get('startTime') as string;
       const endTime = formData.get('endTime') as string;
       const area = formData.get('area') as string;
+      const detailedAddress = formData.get('detailedAddress') as string;
       const capacity = parseInt(formData.get('capacity') as string) || 30;
       
       // 验证必填字段
@@ -692,6 +695,7 @@ export default function TrainingPerformance() {
         expert_id: expertId,
         expert_name: expert.name,
         area: area || null,
+        detailed_address: detailedAddress || null,
         revenue: null,
         status: status,
         rating: null,
@@ -1352,6 +1356,17 @@ export default function TrainingPerformance() {
                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                      />
                    </div>
+
+                   {/* 详细地址 - 可选 */}
+                   <div className="md:col-span-2">
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">详细地址</label>
+                     <input
+                       type="text"
+                       name="detailedAddress"
+                       placeholder="例如：北京市朝阳区建国路88号SOHO现代城A座10层"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     />
+                   </div>
                  </div>
 
                  {/* 提示信息 */}
@@ -1464,6 +1479,16 @@ export default function TrainingPerformance() {
                          <option key={area} value={area}>{area}</option>
                        ))}
                      </select>
+                   </div>
+                   <div className="md:col-span-2">
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">详细地址</label>
+                     <input
+                       type="text"
+                       name="detailedAddress"
+                       defaultValue={editSession.detailedAddress || ''}
+                       placeholder="例如：北京市朝阳区建国路88号SOHO现代城A座10层"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     />
                    </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">开始时间</label>
@@ -1634,9 +1659,23 @@ export default function TrainingPerformance() {
                       <Clock size={16} className="text-gray-500 dark:text-gray-400 mr-2" />
                       <span className="text-sm text-gray-700 dark:text-gray-300">{selectedSession.startTime} - {selectedSession.endTime}</span>
                     </div>
-                    <div className="flex items-center">
-                      <MapPin size={16} className="text-gray-500 dark:text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{selectedSession.area}</span>
+                    <div className="flex items-start">
+                      <MapPin size={16} className="text-gray-500 dark:text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{selectedSession.area}</span>
+                        {selectedSession.detailedAddress && (
+                          <a
+                            href={`https://www.amap.com/search?query=${encodeURIComponent(selectedSession.detailedAddress)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-1 flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span>{selectedSession.detailedAddress}</span>
+                            <ExternalLink size={12} className="flex-shrink-0" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
