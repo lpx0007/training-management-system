@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import Sidebar from '@/components/Sidebar';
 import supabaseService from '@/lib/supabase/supabaseService';
 import type { Expert } from '@/lib/supabase/types';
+import { generateDefaultAvatar } from '@/utils/imageUtils';
 
 // 计算专家领域分布
 const calculateFieldData = (experts: Expert[]) => {
@@ -653,7 +654,7 @@ export default function ExpertManagement() {
                           <div className="flex items-center">
                             <div className="relative flex-shrink-0">
                               <img
-                                src={expert.avatar ?? ''}
+                                src={expert.avatar || generateDefaultAvatar(expert.name ?? '专家', 80)}
                                 alt={expert.name ?? ''}
                                 className="w-10 h-10 rounded-full object-cover"
                               />
@@ -1196,7 +1197,7 @@ export default function ExpertManagement() {
               <div className="flex flex-col md:flex-row gap-6 mb-6">
                 <div className="flex-shrink-0">
                   <img
-                    src={selectedExpert.avatar ?? ''}
+                    src={selectedExpert.avatar || generateDefaultAvatar(selectedExpert.name ?? '专家', 256)}
                     alt={selectedExpert.name ?? ''}
                     className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-md"
                   />
