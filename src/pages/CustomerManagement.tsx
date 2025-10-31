@@ -20,6 +20,7 @@ import {
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
 import { toast } from 'sonner';
+import { generateDefaultAvatar } from '@/utils/imageUtils';
 
 import supabaseService from '@/lib/supabase/supabaseService';
 import type { Customer, CustomerFrontend } from '@/lib/supabase/types';
@@ -50,7 +51,7 @@ export default function CustomerManagement() {
     location: '',
     status: '潜在客户',
     tags: [],
-    avatar: 'https://space.coze.cn/api/coze_space/gen_image?image_size=square&prompt=professional%20business%20person&sign=default'
+    avatar: null
   });
 
   // 业务员列表
@@ -359,7 +360,7 @@ export default function CustomerManagement() {
         follow_up_status: '待跟进',
         last_contact: new Date().toISOString().split('T')[0],
         tags: (newCustomerData.tags as string[]) || [],
-        avatar: 'https://space.coze.cn/api/coze_space/gen_image?image_size=square&prompt=professional%20business%20person&sign=default'
+        avatar: null
       };
 
       console.log('准备添加的客户数据:', customerToAdd);
@@ -423,7 +424,7 @@ export default function CustomerManagement() {
           location: '',
           status: '潜在客户',
           tags: [],
-          avatar: 'https://space.coze.cn/api/coze_space/gen_image?image_size=square&prompt=professional%20business%20person&sign=default'
+          avatar: null
         });
 
         // 关闭模态框
@@ -1015,7 +1016,7 @@ export default function CustomerManagement() {
                             <div className="flex-shrink-0 h-10 w-10">
                               <img
                                 className="h-10 w-10 rounded-full object-cover"
-                                src={customer.avatar || ''}
+                                src={customer.avatar || generateDefaultAvatar(customer.name, 80)}
                                 alt={customer.name}
                               />
                             </div>
@@ -1189,7 +1190,7 @@ export default function CustomerManagement() {
               <div className="flex flex-col md:flex-row gap-6 mb-6">
                 <div className="flex-shrink-0">
                   <img
-                    src={selectedCustomer.avatar || ''}
+                    src={selectedCustomer.avatar || generateDefaultAvatar(selectedCustomer.name, 256)}
                     alt={selectedCustomer.name}
                     className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-md"
                   />

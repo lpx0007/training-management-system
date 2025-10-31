@@ -1290,6 +1290,60 @@ class SupabaseService {
   }
 
   /**
+   * 更新用户头像
+   */
+  async updateUserAvatar(userId: string, avatarUrl: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ avatar: avatarUrl })
+        .eq('id', userId);
+
+      if (error) throw error;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'updateUserAvatar');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 更新专家头像
+   */
+  async updateExpertAvatar(expertId: number, avatarUrl: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('experts')
+        .update({ avatar: avatarUrl })
+        .eq('id', expertId);
+
+      if (error) throw error;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'updateExpertAvatar');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 更新客户头像
+   */
+  async updateCustomerAvatar(customerId: number, avatarUrl: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ avatar: avatarUrl })
+        .eq('id', customerId);
+
+      if (error) throw error;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'updateCustomerAvatar');
+      throw supabaseError;
+    }
+  }
+
+  /**
    * 更新业务员手机号
    */
   async updateSalespersonPhone(userId: string, phone: string): Promise<void> {

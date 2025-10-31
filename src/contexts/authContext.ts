@@ -10,6 +10,7 @@ export interface User {
   role: UserRole;
   name: string;
   department?: string;
+  avatar?: string | null; // 用户头像 URL
   permissions?: string[]; // 用户权限列表
 }
 

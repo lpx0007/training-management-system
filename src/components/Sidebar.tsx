@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '@/contexts/authContext';
 import { BarChart2, Calendar, UserCheck, DollarSign, Users, Database, GraduationCap, Shield, Settings, Megaphone } from 'lucide-react';
 import dataService from '@/lib/dataService';
+import { generateDefaultAvatar } from '@/utils/imageUtils';
 
 interface NavItem {
   icon: React.ReactNode;
@@ -162,9 +163,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath }: SidebarProps) => 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
-                <span className="text-xs font-medium">{user?.name?.charAt(0)}</span>
-              </div>
+              <img
+                src={user?.avatar || generateDefaultAvatar(user?.name || '用户', 64)}
+                alt={user?.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-800 dark:text-white">{user?.name}</p>

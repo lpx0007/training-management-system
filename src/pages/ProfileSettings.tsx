@@ -6,6 +6,7 @@ import { User, Mail, Phone, Building, Lock, Save } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import { toast } from 'sonner';
 import supabaseService from '@/lib/supabase/supabaseService';
+import AvatarUpload from '@/components/AvatarUpload';
 
 export default function ProfileSettings() {
   const { user, setUser } = useContext(AuthContext);
@@ -100,6 +101,27 @@ export default function ProfileSettings() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // 处理头像上传成功
+  const handleAvatarUpload = async (thumbnailUrl: string) => {
+    if (!user) return;
+    
+    try {
+      // 更新数据库
+      await supabaseService.updateUserAvatar(user.id, thumbnailUrl);
+      
+      // 更新本地用户状态
+      setUser({
+        ...user,
+        avatar: thumbnailUrl,
+      });
+      
+      toast.success('头像更新成功');
+    } catch (error) {
+      console.error('更新头像失败:', error);
+      toast.error('头像更新失败');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,14 +291,21 @@ export default function ProfileSettings() {
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700"
             >
               <div className="flex items-center mb-6">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
-                  {user?.name?.charAt(0)}
-                </div>
+                <AvatarUpload
+                  currentAvatar={user?.avatar}
+                  userName={user?.name || '用户'}
+                  userId={user?.id || ''}
+                  type="user"
+                  onUploadSuccess={handleAvatarUpload}
+                  size={80}
+                  editable={true}
+                />
                 <div className="ml-6">
                   <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{user?.name}</h2>
                   <p className="text-gray-500 dark:text-gray-400">
                     {user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : '专家'}
                   </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">点击头像可更换</p>
                 </div>
               </div>
 

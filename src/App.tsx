@@ -212,6 +212,7 @@ export default function App() {
           role: profile.role,
           name: profile.name,
           department: profile.department || undefined,
+          avatar: profile.avatar || undefined,
         };
         setUser(userData);
         setIsAuthenticated(true);
