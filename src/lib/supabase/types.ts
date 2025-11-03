@@ -30,6 +30,39 @@ export interface UserProfile {
   updated_at: string;
 }
 
+// 招商简章
+export interface Prospectus {
+  id: number;
+  name: string;
+  type: string | null;
+  description: string | null;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  sealed_file_name: string | null;
+  sealed_file_path: string | null;
+  sealed_file_size: number | null;
+  has_sealed_version: boolean;
+  uploaded_by: string | null;
+  uploaded_at: string;
+  updated_at: string;
+  status: 'active' | 'inactive' | 'error';
+  download_count: number;
+  created_at: string;
+}
+
+// 简章下载记录
+export interface ProspectusDownload {
+  id: number;
+  prospectus_id: number;
+  user_id: string;
+  user_name: string;
+  file_type: 'original' | 'sealed';
+  downloaded_at: string;
+  training_session_id: number | null;
+  created_at: string;
+}
+
 // 客户（数据库字段）
 export interface Customer {
   id: number;
@@ -131,11 +164,12 @@ export interface TrainingSession {
   salesperson_name: string | null;
   course_id: string | null;
   course_description: string | null;
+  prospectus_id: number | null;  // 招商简章ID
   created_at: string;
 }
 
 // 培训场次（前端友好类型，包含驼峰命名字段）
-export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'start_time' | 'end_time' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_description' | 'created_at' | 'detailed_address'> {
+export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'start_time' | 'end_time' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id'> {
   expertId: number | null;
   expert: string;
   startTime: string;
@@ -146,6 +180,7 @@ export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_i
   salespersonName: string | null;
   courseId: string | null;
   courseDescription: string | null;
+  prospectusId: number | null;  // 招商简章ID
   createdAt: string;
   participantsList?: TrainingParticipantFrontend[];
 }
@@ -245,6 +280,7 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     salespersonName: dbSession.salesperson_name,
     courseId: dbSession.course_id,
     courseDescription: dbSession.course_description,
+    prospectusId: dbSession.prospectus_id,
     createdAt: dbSession.created_at,
     participantsList: []
   };
@@ -351,6 +387,16 @@ export interface Database {
         Row: ExpertFeedback;
         Insert: Omit<ExpertFeedback, 'id' | 'created_at'>;
         Update: Partial<Omit<ExpertFeedback, 'id' | 'created_at'>>;
+      };
+      prospectuses: {
+        Row: Prospectus;
+        Insert: Omit<Prospectus, 'id' | 'created_at' | 'updated_at' | 'uploaded_at'>;
+        Update: Partial<Omit<Prospectus, 'id' | 'created_at' | 'uploaded_at'>>;
+      };
+      prospectus_downloads: {
+        Row: ProspectusDownload;
+        Insert: Omit<ProspectusDownload, 'id' | 'created_at' | 'downloaded_at'>;
+        Update: never;
       };
     };
   };

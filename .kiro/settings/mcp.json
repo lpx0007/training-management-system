@@ -17,7 +17,8 @@
         "execute_sql",
         "list_migrations",
         "list_projects",
-        "get_advisors"
+        "get_advisors",
+        "list_edge_functions"
       ]
     }
   }

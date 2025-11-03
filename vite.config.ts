@@ -1,26 +1,16 @@
-/** WARNING: DON'T EDIT THIS FILE */
-/** WARNING: DON'T EDIT THIS FILE */
-/** WARNING: DON'T EDIT THIS FILE */
-
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tsconfigPaths from "vite-tsconfig-paths";
-
-function getPlugins() {
-  const plugins = [react(), tsconfigPaths()];
-  return plugins;
-}
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
-  plugins: getPlugins(),
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'excel-libs': ['xlsx', 'papaparse'],
-          'pdf-libs': ['jspdf', 'jspdf-autotable']
-        }
-      }
-    }
-  }
-});
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    port: 3000,
+    host: true,
+  },
+})

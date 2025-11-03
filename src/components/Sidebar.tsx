@@ -1,7 +1,7 @@
 import { useContext, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '@/contexts/authContext';
-import { BarChart2, Calendar, UserCheck, DollarSign, Users, Database, GraduationCap, Shield, Settings, Megaphone } from 'lucide-react';
+import { BarChart2, Calendar, UserCheck, DollarSign, Users, Database, GraduationCap, Shield, Settings, Megaphone, Image, FileText } from 'lucide-react';
 import dataService from '@/lib/dataService';
 import { generateDefaultAvatar } from '@/utils/imageUtils';
 
@@ -59,10 +59,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath }: SidebarProps) => 
     { icon: <UserCheck size={20} />, label: '专家管理', path: '/expert-management', permission: ['admin'] },
     { icon: <DollarSign size={20} />, label: '销售追踪', path: '/sales-tracking', permission: ['admin'] },
     { icon: <Users size={20} />, label: '客户管理', path: '/customer-management', permission: ['admin', 'salesperson'] },
+    { icon: <Image size={20} />, label: '海报生成', path: '/poster-generator', permission: ['admin'] },
     { icon: <Database size={20} />, label: '数据管理', path: '/data-management', permission: ['admin'] },
     { icon: <Users size={20} />, label: '业务员管理', path: '/salesperson-management', permission: ['admin'] },
     { icon: <Megaphone size={20} />, label: '公告管理', path: '/announcement-management', permission: ['admin'] },
     { icon: <Shield size={20} />, label: '权限管理', path: '/permission-management', permission: ['admin'] },
+    { icon: <FileText size={20} />, label: '招商简章', path: '/prospectus-management', permission: ['admin'] },
     { icon: <Settings size={20} />, label: '个人设置', path: '/profile-settings', permission: ['admin', 'salesperson', 'expert'] }
   ];
   

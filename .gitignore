@@ -34,3 +34,36 @@ database-backup/history/
 database-backups/
 *.sql.backup
 backup_*.sql
+
+# Local Netlify folder
+.netlify
+
+# Documentation and test files (not needed for deployment)
+*_GUIDE.md
+*_TEST*.md
+*_SUMMARY.md
+*_COMPLETE.md
+*_STATUS.md
+*_FEATURE.md
+*_FIX*.md
+*_UPDATE*.md
+*_PROGRESS*.md
+*_PHASE*.md
+*_CHECKLIST.md
+IMPLEMENTATION_*.md
+SYSTEM_*.md
+API_*.md
+ADD_*.md
+INDENTATION_*.md
+POSTER_*.md
+PROSPECTUS_*.md
+PROMPT_*.md
+AVATAR_*.md
+EXPERT_*.md
+test-poster.*
+GIT_COMMIT_CHECKLIST.md
+
+# Keep only essential docs
+!README.md
+!docs/POSTER_GENERATION_GUIDE.md
+!docs/create-expert-accounts-guide.md

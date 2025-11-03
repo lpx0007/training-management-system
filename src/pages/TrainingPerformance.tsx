@@ -5,7 +5,8 @@ import { useState, useContext, useEffect } from 'react';
   import { Empty } from '@/components/Empty';
   import Sidebar from '@/components/Sidebar';
   import supabaseService from '@/lib/supabase/supabaseService';
-  import type { TrainingSessionFrontend, Course, Customer, Expert } from '@/lib/supabase/types';
+  import prospectusService from '@/lib/supabase/prospectusService';
+  import type { TrainingSessionFrontend, Course, Customer, Expert, Prospectus } from '@/lib/supabase/types';
   import { toast } from 'sonner';
   import { exportAllAttendanceSheet, exportAttendanceSheetBySalesperson } from '@/lib/exporters/attendanceSheetExporter';
   import { generateDefaultAvatar } from '@/utils/imageUtils';
@@ -29,6 +30,7 @@ export default function TrainingPerformance() {
   const [experts, setExperts] = useState<{id: number; name: string}[]>([]);
   const [areas, setAreas] = useState<string[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [prospectuses, setProspectuses] = useState<Prospectus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<TrainingSessionFrontend | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -109,6 +111,10 @@ export default function TrainingPerformance() {
         // 获取课程列表
         const courseList = await supabaseService.getCourses();
         setCourses(courseList);
+        
+        // 获取招商简章列表
+        const prospectList = await prospectusService.getProspectuses();
+        setProspectuses(prospectList);
       } catch (error) {
         console.error('获取数据失败', error);
         toast.error('获取数据失败，请重试');
@@ -490,6 +496,7 @@ export default function TrainingPerformance() {
       const status = formData.get('status') as string;
       const salespersonId = formData.get('salespersonId') as string;
       const capacity = parseInt(formData.get('capacity') as string) || 30;
+      const prospectusId = formData.get('prospectusId') as string;
       
       // 调试日志：查看所有表单数据
       console.log('📝 编辑表单提交数据:', {
@@ -592,7 +599,8 @@ export default function TrainingPerformance() {
         status: status || null,
         course_id: null,
         course_description: courseDescription || null,
-        salesperson_id: salespersonId || null
+        salesperson_id: salespersonId || null,
+        prospectus_id: prospectusId ? parseInt(prospectusId) : null
       };
       
       console.log('💾 准备更新到数据库的数据:', updateData);
@@ -647,6 +655,7 @@ export default function TrainingPerformance() {
       const area = formData.get('area') as string;
       const detailedAddress = formData.get('detailedAddress') as string;
       const capacity = parseInt(formData.get('capacity') as string) || 30;
+      const prospectusId = formData.get('prospectusId') as string;
       
       // 验证必填字段
       if (!name || !startDate || !endDate || !expertId) {
@@ -752,7 +761,8 @@ export default function TrainingPerformance() {
         salesperson_id: null,
         salesperson_name: user?.name || null,
         course_id: null,
-        course_description: null
+        course_description: null,
+        prospectus_id: prospectusId ? parseInt(prospectusId) : null
       });
       
       toast.success('培训添加成功');
@@ -1419,6 +1429,22 @@ export default function TrainingPerformance() {
                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                      />
                    </div>
+
+                   {/* 招商简章 - 可选 */}
+                   <div className="md:col-span-2">
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">招商简章</label>
+                     <select
+                       name="prospectusId"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     >
+                       <option value="">不关联简章</option>
+                       {prospectuses.map(p => (
+                         <option key={p.id} value={p.id}>
+                           {p.name} {p.has_sealed_version && '(已盖章)'}
+                         </option>
+                       ))}
+                     </select>
+                   </div>
                  </div>
 
                  {/* 提示信息 */}
@@ -1541,6 +1567,21 @@ export default function TrainingPerformance() {
                        placeholder="例如：北京市朝阳区建国路88号SOHO现代城A座10层"
                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                      />
+                   </div>
+                   <div className="md:col-span-2">
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">招商简章</label>
+                     <select
+                       name="prospectusId"
+                       defaultValue={editSession.prospectusId || ''}
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     >
+                       <option value="">不关联简章</option>
+                       {prospectuses.map(p => (
+                         <option key={p.id} value={p.id}>
+                           {p.name} {p.has_sealed_version && '(已盖章)'}
+                         </option>
+                       ))}
+                     </select>
                    </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">开始时间</label>
@@ -1814,6 +1855,105 @@ export default function TrainingPerformance() {
                           <span className="text-sm font-medium text-gray-800 dark:text-white">{getCourseName(selectedSession.courseId || undefined)}</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* 招商简章区域 */}
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                      <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-3">招商简章</h4>
+                      {selectedSession.prospectusId ? (
+                        <div className="space-y-3">
+                          {(() => {
+                            const prospectus = prospectuses.find(p => p.id === selectedSession.prospectusId);
+                            if (!prospectus) {
+                              return (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  简章信息加载失败
+                                </div>
+                              );
+                            }
+                            return (
+                              <>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium text-gray-800 dark:text-white flex items-center">
+                                      {prospectus.name}
+                                      {prospectus.has_sealed_version && (
+                                        <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
+                                          已盖章
+                                        </span>
+                                      )}
+                                    </div>
+                                    {prospectus.type && (
+                                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        类型: {prospectus.type}
+                                      </div>
+                                    )}
+                                    {prospectus.description && (
+                                      <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                                        {prospectus.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {(user?.role === 'admin' || user?.role === 'salesperson') && (
+                                  <button
+                                    onClick={async () => {
+                                      const loadingToast = toast.loading('正在准备下载...');
+                                      try {
+                                        const url = await prospectusService.downloadProspectus(
+                                          prospectus.id,
+                                          true,
+                                          selectedSession.id
+                                        );
+                                        
+                                        // 使用 fetch 获取文件内容，然后创建 Blob URL 强制下载
+                                        const response = await fetch(url);
+                                        if (!response.ok) {
+                                          throw new Error('下载文件失败');
+                                        }
+                                        
+                                        const blob = await response.blob();
+                                        const blobUrl = URL.createObjectURL(blob);
+                                        
+                                        // 创建隐藏的 a 标签触发下载
+                                        const link = document.createElement('a');
+                                        link.href = blobUrl;
+                                        link.download = prospectus.name + '.pdf';
+                                        link.style.display = 'none';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        
+                                        // 清理
+                                        document.body.removeChild(link);
+                                        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+                                        
+                                        toast.dismiss(loadingToast);
+                                        toast.success('简章下载成功');
+                                      } catch (error: any) {
+                                        toast.dismiss(loadingToast);
+                                        toast.error(error.message || '下载失败');
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+                                  >
+                                    <i className="fas fa-download"></i>
+                                    下载简章{prospectus.has_sealed_version && '（盖章版）'}
+                                  </button>
+                                )}
+                                {user?.role !== 'admin' && user?.role !== 'salesperson' && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
+                                    专家角色仅可查看，无下载权限
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                          暂无关联招商简章
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

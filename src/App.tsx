@@ -14,6 +14,8 @@ import ProfileSettings from "@/pages/ProfileSettings";
 import AnnouncementManagement from "@/pages/AnnouncementManagement";
 import NotificationCenter from "@/pages/NotificationCenter";
 import AnnouncementList from "@/pages/AnnouncementList";
+import PosterGenerator from "@/pages/PosterGenerator";
+import ProspectusManagement from "@/pages/ProspectusManagement";
 import { useState, useEffect } from "react";
 import { AuthContext, User } from '@/contexts/authContext';
 import { toast } from 'sonner';
@@ -398,6 +400,16 @@ export default function App() {
         <Route path="/announcements" element={
           <ProtectedRoute>
             <AnnouncementList />
+          </ProtectedRoute>
+        } />
+        <Route path="/poster-generator" element={
+          <ProtectedRoute requiredRole={['admin']}>
+            <PosterGenerator />
+          </ProtectedRoute>
+        } />
+        <Route path="/prospectus-management" element={
+          <ProtectedRoute requiredRole={['admin']}>
+            <ProspectusManagement />
           </ProtectedRoute>
         } />
       </Routes>
