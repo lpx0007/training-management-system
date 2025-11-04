@@ -188,6 +188,134 @@ class SupabaseService {
   }
 
   /**
+   * 获取所有用户（包含权限和功能面板信息）
+   */
+  async getAllUsersWithPermissions() {
+    try {
+      const { data: users, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!users) return [];
+
+      // 并行获取每个用户的权限和功能面板访问权限
+      const usersWithPermissions = await Promise.all(
+        users.map(async (user) => {
+          const [permissions, menuAccess] = await Promise.all([
+            this.getUserPermissions(user.id),
+            this.getUserMenuAccess(user.id)
+          ]);
+
+          return {
+            ...user,
+            permissions,
+            menuAccess
+          };
+        })
+      );
+
+      return usersWithPermissions;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getAllUsersWithPermissions');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 获取指定角色的用户
+   */
+  async getUsersByRole(role: 'admin' | 'salesperson' | 'expert') {
+    try {
+      const { data: users, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('role', role)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!users) return [];
+
+      // 并行获取每个用户的权限和功能面板访问权限
+      const usersWithPermissions = await Promise.all(
+        users.map(async (user) => {
+          const [permissions, menuAccess] = await Promise.all([
+            this.getUserPermissions(user.id),
+            this.getUserMenuAccess(user.id)
+          ]);
+
+          return {
+            ...user,
+            permissions,
+            menuAccess
+          };
+        })
+      );
+
+      return usersWithPermissions;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getUsersByRole');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 搜索用户
+   */
+  async searchUsers(searchTerm: string, filters?: { role?: string; status?: string }) {
+    try {
+      let query = supabase
+        .from('user_profiles')
+        .select('*');
+
+      // 搜索条件
+      if (searchTerm) {
+        query = query.or(`name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%,department.ilike.%${searchTerm}%`);
+      }
+
+      // 筛选条件
+      if (filters?.role) {
+        query = query.eq('role', filters.role);
+      }
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data: users, error } = await query;
+
+      if (error) throw error;
+      if (!users) return [];
+
+      // 并行获取每个用户的权限和功能面板访问权限
+      const usersWithPermissions = await Promise.all(
+        users.map(async (user) => {
+          const [permissions, menuAccess] = await Promise.all([
+            this.getUserPermissions(user.id),
+            this.getUserMenuAccess(user.id)
+          ]);
+
+          return {
+            ...user,
+            permissions,
+            menuAccess
+          };
+        })
+      );
+
+      return usersWithPermissions;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'searchUsers');
+      throw supabaseError;
+    }
+  }
+
+  /**
    * 监听认证状态变化
    */
   onAuthStateChange(callback: (event: string, session: Session | null) => void) {
@@ -1060,6 +1188,448 @@ class SupabaseService {
       const supabaseError = handleSupabaseError(error);
       logError(supabaseError, 'updateUserPermissions');
       throw supabaseError;
+    }
+  }
+
+  /**
+   * 批量更新用户权限（针对选中的用户）
+   */
+  async batchUpdateUserPermissions(
+    userIds: string[],
+    permissionIds: string[],
+    action: 'grant' | 'revoke'
+  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const result = { success: 0, failed: 0, errors: [] as string[] };
+
+    try {
+      for (const userId of userIds) {
+        try {
+          if (action === 'grant') {
+            // 授予权限：添加新权限（忽略已存在的）
+            const { error } = await supabase
+              .from('user_permissions')
+              .upsert(
+                permissionIds.map(permissionId => ({
+                  user_id: userId,
+                  permission_id: permissionId,
+                })),
+                { onConflict: 'user_id,permission_id', ignoreDuplicates: true }
+              );
+
+            if (error) throw error;
+          } else {
+            // 撤销权限：删除指定权限
+            const { error } = await supabase
+              .from('user_permissions')
+              .delete()
+              .eq('user_id', userId)
+              .in('permission_id', permissionIds);
+
+            if (error) throw error;
+          }
+
+          result.success++;
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push(`用户 ${userId}: ${error.message}`);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'batchUpdateUserPermissions');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 批量更新角色权限（针对指定角色的所有用户）
+   */
+  async batchUpdateRolePermissions(
+    role: 'admin' | 'salesperson' | 'expert',
+    permissionIds: string[],
+    strategy: 'override' | 'merge' | 'reset'
+  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const result = { success: 0, failed: 0, errors: [] as string[] };
+
+    try {
+      // 获取该角色的所有用户
+      const { data: users, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('role', role);
+
+      if (usersError) throw usersError;
+      if (!users || users.length === 0) {
+        return result;
+      }
+
+      const userIds = users.map(u => u.id);
+
+      // 根据策略执行不同的操作
+      if (strategy === 'override') {
+        // 完全覆盖：删除现有权限，添加新权限
+        for (const userId of userIds) {
+          try {
+            await this.updateUserPermissions(userId, permissionIds);
+            result.success++;
+          } catch (error: any) {
+            result.failed++;
+            result.errors.push(`用户 ${userId}: ${error.message}`);
+          }
+        }
+      } else if (strategy === 'merge') {
+        // 合并模式：保留现有权限，添加新权限
+        const batchResult = await this.batchUpdateUserPermissions(userIds, permissionIds, 'grant');
+        return batchResult;
+      } else if (strategy === 'reset') {
+        // 重置为角色默认权限
+        const { getRoleDefaultPermissions } = await import('@/constants/permissions');
+        const defaultPermissions = getRoleDefaultPermissions(role);
+        
+        for (const userId of userIds) {
+          try {
+            await this.updateUserPermissions(userId, defaultPermissions);
+            result.success++;
+          } catch (error: any) {
+            result.failed++;
+            result.errors.push(`用户 ${userId}: ${error.message}`);
+          }
+        }
+      }
+
+      return result;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'batchUpdateRolePermissions');
+      throw supabaseError;
+    }
+  }
+
+  // ============================================
+  // 功能面板访问管理方法
+  // ============================================
+
+  /**
+   * 获取所有功能面板定义
+   */
+  async getAllMenuFeatures() {
+    try {
+      const { data, error } = await supabase
+        .from('menu_features')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getAllMenuFeatures');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 获取用户可访问的功能面板
+   */
+  async getUserMenuAccess(userId: string): Promise<string[]> {
+    try {
+      const { data, error } = await supabase
+        .from('user_menu_access')
+        .select('menu_feature_id')
+        .eq('user_id', userId)
+        .eq('enabled', true);
+
+      if (error) throw error;
+      return data?.map((m: any) => m.menu_feature_id) || [];
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getUserMenuAccess');
+      return [];
+    }
+  }
+
+  /**
+   * 更新用户功能面板访问权限
+   */
+  async updateUserMenuAccess(userId: string, featureIds: string[]): Promise<boolean> {
+    try {
+      // 先删除现有访问权限
+      await supabase
+        .from('user_menu_access')
+        .delete()
+        .eq('user_id', userId);
+
+      // 添加新的访问权限
+      if (featureIds.length > 0) {
+        const { error } = await supabase
+          .from('user_menu_access')
+          .insert(
+            featureIds.map(featureId => ({
+              user_id: userId,
+              menu_feature_id: featureId,
+              enabled: true,
+            })) as any
+          );
+
+        if (error) throw error;
+      }
+
+      return true;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'updateUserMenuAccess');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 批量更新功能面板访问权限（针对选中的用户）
+   */
+  async batchUpdateMenuAccess(
+    userIds: string[],
+    featureIds: string[],
+    action: 'enable' | 'disable'
+  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const result = { success: 0, failed: 0, errors: [] as string[] };
+
+    try {
+      for (const userId of userIds) {
+        try {
+          if (action === 'enable') {
+            // 启用功能面板
+            const { error } = await supabase
+              .from('user_menu_access')
+              .upsert(
+                featureIds.map(featureId => ({
+                  user_id: userId,
+                  menu_feature_id: featureId,
+                  enabled: true,
+                })),
+                { onConflict: 'user_id,menu_feature_id' }
+              );
+
+            if (error) throw error;
+          } else {
+            // 禁用功能面板
+            const { error } = await supabase
+              .from('user_menu_access')
+              .delete()
+              .eq('user_id', userId)
+              .in('menu_feature_id', featureIds);
+
+            if (error) throw error;
+          }
+
+          result.success++;
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push(`用户 ${userId}: ${error.message}`);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'batchUpdateMenuAccess');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 批量更新角色功能面板访问权限（针对指定角色的所有用户）
+   */
+  async batchUpdateRoleMenuAccess(
+    role: 'admin' | 'salesperson' | 'expert',
+    featureIds: string[],
+    strategy: 'override' | 'merge' | 'reset'
+  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const result = { success: 0, failed: 0, errors: [] as string[] };
+
+    try {
+      // 获取该角色的所有用户
+      const { data: users, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('role', role);
+
+      if (usersError) throw usersError;
+      if (!users || users.length === 0) {
+        return result;
+      }
+
+      const userIds = users.map(u => u.id);
+
+      // 根据策略执行不同的操作
+      if (strategy === 'override') {
+        // 完全覆盖
+        for (const userId of userIds) {
+          try {
+            await this.updateUserMenuAccess(userId, featureIds);
+            result.success++;
+          } catch (error: any) {
+            result.failed++;
+            result.errors.push(`用户 ${userId}: ${error.message}`);
+          }
+        }
+      } else if (strategy === 'merge') {
+        // 合并模式
+        const batchResult = await this.batchUpdateMenuAccess(userIds, featureIds, 'enable');
+        return batchResult;
+      } else if (strategy === 'reset') {
+        // 重置为角色默认
+        const { getRoleDefaultMenuFeatures } = await import('@/constants/menuFeatures');
+        const defaultFeatures = getRoleDefaultMenuFeatures(role);
+        
+        for (const userId of userIds) {
+          try {
+            await this.updateUserMenuAccess(userId, defaultFeatures);
+            result.success++;
+          } catch (error: any) {
+            result.failed++;
+            result.errors.push(`用户 ${userId}: ${error.message}`);
+          }
+        }
+      }
+
+      return result;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'batchUpdateRoleMenuAccess');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 验证用户是否可访问功能面板
+   */
+  async canAccessMenuFeature(userId: string, featureId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('user_menu_access')
+        .select('enabled')
+        .eq('user_id', userId)
+        .eq('menu_feature_id', featureId)
+        .single();
+
+      if (error) return false;
+      return data?.enabled || false;
+    } catch (error) {
+      logError(handleSupabaseError(error), 'canAccessMenuFeature');
+      return false;
+    }
+  }
+
+  // ============================================
+  // 审计日志方法
+  // ============================================
+
+  /**
+   * 记录权限变更
+   */
+  async logPermissionChange(
+    operatorId: string,
+    targetUserId: string,
+    action: 'grant' | 'revoke',
+    permissions: string[]
+  ): Promise<void> {
+    try {
+      // 获取操作者和目标用户信息
+      const [operator, targetUser] = await Promise.all([
+        this.getUserProfile(operatorId),
+        this.getUserProfile(targetUserId)
+      ]);
+
+      const { error } = await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: operatorId,
+          user_name: operator?.name || 'Unknown',
+          action: `permission_${action}`,
+          resource_type: 'user_permissions',
+          resource_id: targetUserId,
+          details: {
+            target_user_name: targetUser?.name || 'Unknown',
+            permissions,
+            action
+          },
+          status: 'success'
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      logError(handleSupabaseError(error), 'logPermissionChange');
+      // 审计日志失败不应阻止主操作
+    }
+  }
+
+  /**
+   * 获取用户权限变更历史
+   */
+  async getUserPermissionHistory(
+    userId: string,
+    options?: { startDate?: Date; endDate?: Date }
+  ) {
+    try {
+      let query = supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('resource_type', 'user_permissions')
+        .eq('resource_id', userId)
+        .order('timestamp', { ascending: false });
+
+      if (options?.startDate) {
+        query = query.gte('timestamp', options.startDate.toISOString());
+      }
+      if (options?.endDate) {
+        query = query.lte('timestamp', options.endDate.toISOString());
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getUserPermissionHistory');
+      return [];
+    }
+  }
+
+  /**
+   * 获取权限变更统计
+   */
+  async getPermissionChangeStats(options?: { startDate?: Date; endDate?: Date }) {
+    try {
+      let query = supabase
+        .from('audit_logs')
+        .select('action, status, timestamp')
+        .like('action', 'permission_%');
+
+      if (options?.startDate) {
+        query = query.gte('timestamp', options.startDate.toISOString());
+      }
+      if (options?.endDate) {
+        query = query.lte('timestamp', options.endDate.toISOString());
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // 统计数据
+      const stats = {
+        total: data?.length || 0,
+        grant: data?.filter(log => log.action === 'permission_grant').length || 0,
+        revoke: data?.filter(log => log.action === 'permission_revoke').length || 0,
+        success: data?.filter(log => log.status === 'success').length || 0,
+        failed: data?.filter(log => log.status === 'failed').length || 0,
+      };
+
+      return stats;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getPermissionChangeStats');
+      return { total: 0, grant: 0, revoke: 0, success: 0, failed: 0 };
     }
   }
 

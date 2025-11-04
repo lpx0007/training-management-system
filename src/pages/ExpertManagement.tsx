@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
+import { PermissionGuard } from '@/components/PermissionGuard';
 import { toast } from 'sonner';
 import Sidebar from '@/components/Sidebar';
 import supabaseService from '@/lib/supabase/supabaseService';
@@ -333,7 +334,7 @@ export default function ExpertManagement() {
                 <i className="fas fa-bell"></i>
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
-              {user?.role === 'admin' && (
+              <PermissionGuard permission="expert_add">
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -343,7 +344,7 @@ export default function ExpertManagement() {
                   <Plus size={16} className="mr-2" />
                   添加专家
                 </motion.button>
-              )}
+              </PermissionGuard>
             </div>
           </div>
         </header>
@@ -765,24 +766,28 @@ export default function ExpertManagement() {
                             </motion.button>
                             {user?.role === 'admin' && (
                               <>
-                                <motion.button
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                  onClick={() => openEditModal(expert)}
-                                  className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
-                                  title="编辑"
-                                >
-                                  <Edit size={18} />
-                                </motion.button>
-                                <motion.button
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                  onClick={() => deleteExpert(expert.id)}
-                                  className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                                  title="删除"
-                                >
-                                  <Trash2 size={18} />
-                                </motion.button>
+                                <PermissionGuard permission="expert_edit">
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => openEditModal(expert)}
+                                    className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
+                                    title="编辑"
+                                  >
+                                    <Edit size={18} />
+                                  </motion.button>
+                                </PermissionGuard>
+                                <PermissionGuard permission="expert_delete">
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => deleteExpert(expert.id)}
+                                    className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                                    title="删除"
+                                  >
+                                    <Trash2 size={18} />
+                                  </motion.button>
+                                </PermissionGuard>
                               </>
                             )}
                           </div>

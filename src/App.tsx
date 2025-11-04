@@ -25,6 +25,8 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [menuAccess, setMenuAccess] = useState<string[]>([]);
 
   // 检查现有 session
   useEffect(() => {
@@ -165,6 +167,15 @@ export default function App() {
       if (profile) {
         console.log('✅ 用户资料加载成功:', profile.name, profile.role);
         
+        // 并行加载用户权限和功能面板访问权限
+        const [userPermissions, userMenuAccess] = await Promise.all([
+          supabaseService.getUserPermissions(userId),
+          supabaseService.getUserMenuAccess(userId)
+        ]);
+        
+        console.log('✅ 权限加载成功:', userPermissions.length, '个权限');
+        console.log('✅ 功能面板加载成功:', userMenuAccess.length, '个面板');
+        
         const userData: User = {
           id: profile.id,
           username: profile.username,
@@ -172,9 +183,13 @@ export default function App() {
           name: profile.name,
           department: profile.department || undefined,
           avatar: profile.avatar || undefined,
+          permissions: userPermissions,
+          menuAccess: userMenuAccess,
         };
         
         setUser(userData);
+        setPermissions(userPermissions);
+        setMenuAccess(userMenuAccess);
         setIsAuthenticated(true);
       } else {
         throw new Error('用户资料为空');
@@ -209,7 +224,17 @@ export default function App() {
           return false;
         }
         
-        // 状态正常，设置用户信息
+        // 状态正常，加载用户权限和功能面板访问权限
+        console.log('📋 加载用户权限和功能面板...');
+        const [userPermissions, userMenuAccess] = await Promise.all([
+          supabaseService.getUserPermissions(profile.id),
+          supabaseService.getUserMenuAccess(profile.id)
+        ]);
+        
+        console.log('✅ 权限加载成功:', userPermissions.length, '个权限');
+        console.log('✅ 功能面板加载成功:', userMenuAccess.length, '个面板');
+        
+        // 设置用户信息（包含权限和功能面板）
         const userData: User = {
           id: profile.id,
           username: profile.username,
@@ -217,8 +242,12 @@ export default function App() {
           name: profile.name,
           department: profile.department || undefined,
           avatar: profile.avatar || undefined,
+          permissions: userPermissions,
+          menuAccess: userMenuAccess,
         };
         setUser(userData);
+        setPermissions(userPermissions);
+        setMenuAccess(userMenuAccess);
         setIsAuthenticated(true);
         
         toast.success(`欢迎，${profile.name}！`);
@@ -243,6 +272,8 @@ export default function App() {
       // 1. 先清理本地状态（立即反馈）
       setIsAuthenticated(false);
       setUser(null);
+      setPermissions([]);
+      setMenuAccess([]);
       
       // 2. 调用 Supabase 登出（清除服务器端 session）
       console.log('调用 Supabase signOut');
@@ -270,6 +301,8 @@ export default function App() {
       // 即使登出失败，也要清理本地状态
       setIsAuthenticated(false);
       setUser(null);
+      setPermissions([]);
+      setMenuAccess([]);
       
       toast.error('登出时出现问题，已清除本地状态');
       window.location.href = '/login';
@@ -308,22 +341,55 @@ export default function App() {
         isAuthenticated, 
         user,
         loading,
+        permissions,
+        menuAccess,
         setIsAuthenticated, 
         setUser, 
         login, 
         logout,
+        
+        // 检查单个权限
         hasPermission: (permission: string) => {
           // 管理员拥有所有权限
           if (user?.role === 'admin') return true;
-          // 业务员默认有添加培训客户的权限
+          // 业务员默认有添加培训客户的权限（兼容性）
           if (user?.role === 'salesperson' && permission === 'training_add_customer') return true;
           // 检查用户是否有特定权限
-          return user?.permissions?.includes(permission) || false;
+          return permissions.includes(permission);
         },
+        
+        // 检查多个权限（任一）
+        hasAnyPermission: (perms: string[]) => {
+          if (user?.role === 'admin') return true;
+          return perms.some(p => permissions.includes(p));
+        },
+        
+        // 检查多个权限（全部）
+        hasAllPermissions: (perms: string[]) => {
+          if (user?.role === 'admin') return true;
+          return perms.every(p => permissions.includes(p));
+        },
+        
+        // 检查是否可访问功能面板
+        canAccessMenu: (featureId: string) => {
+          if (user?.role === 'admin') return true;
+          return menuAccess.includes(featureId);
+        },
+        
+        // 检查是否为管理员
+        isAdmin: () => {
+          return user?.role === 'admin';
+        },
+        
+        // 检查是否可以查看特定客户（保留兼容性）
         canViewCustomer: (customer: {salesperson: string, name?: string}) => {
           // 管理员可以查看所有客户
           if (user?.role === 'admin') {
             console.log('管理员查看客户权限检查通过');
+            return true;
+          }
+          // 有 customer_view_all 权限可以查看所有客户
+          if (permissions.includes('customer_view_all')) {
             return true;
           }
           // 业务员只能查看自己的客户
@@ -347,8 +413,13 @@ export default function App() {
             <TrainingPerformance />
           </ProtectedRoute>
         } />
+        <Route path="/training-management" element={
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
+            <TrainingPerformance />
+          </ProtectedRoute>
+        } />
         <Route path="/expert-management" element={
-          <ProtectedRoute requiredRole={['admin']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
             <ExpertManagement />
           </ProtectedRoute>
         } />
@@ -408,7 +479,7 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/prospectus-management" element={
-          <ProtectedRoute requiredRole={['admin']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
             <ProspectusManagement />
           </ProtectedRoute>
         } />

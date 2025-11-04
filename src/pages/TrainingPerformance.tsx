@@ -4,6 +4,7 @@ import { useState, useContext, useEffect } from 'react';
   import { Calendar, Filter, Search, ChevronDown, Users, Clock, UserCheck, MapPin, GraduationCap, Plus, ExternalLink } from 'lucide-react';
   import { Empty } from '@/components/Empty';
   import Sidebar from '@/components/Sidebar';
+  import { PermissionGuard } from '@/components/PermissionGuard';
   import supabaseService from '@/lib/supabase/supabaseService';
   import prospectusService from '@/lib/supabase/prospectusService';
   import type { TrainingSessionFrontend, Course, Customer, Expert, Prospectus } from '@/lib/supabase/types';
@@ -847,15 +848,15 @@ export default function TrainingPerformance() {
                 <i className="fas fa-bell"></i>
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
-              {user?.role === 'admin' && (
-                   <button 
-                    onClick={openAddModal}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
-                  >
-                    <Plus size={16} className="mr-2" />
-                    添加培训
-                  </button>
-              )}
+              <PermissionGuard permission="training_add">
+                <button 
+                  onClick={openAddModal}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
+                >
+                  <Plus size={16} className="mr-2" />
+                  添加培训
+                </button>
+              </PermissionGuard>
             </div>
           </div>
         </header>
@@ -1231,22 +1232,24 @@ export default function TrainingPerformance() {
                           >
                             详情
                           </button>
-                          {user?.role !== 'salesperson' && (
-                           <button 
-                             className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 mr-3"
-                             onClick={() => handleEditTraining(session)}
-                           >
-                             编辑
-                           </button>
-                          )}
-                          {user?.role !== 'admin' && session.status === 'upcoming' && (
+                          <PermissionGuard permission="training_edit">
                             <button 
-                              className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
-                              onClick={() => handleAddCustomer(session.id)}
+                              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 mr-3"
+                              onClick={() => handleEditTraining(session)}
                             >
-                              添加培训人
+                              编辑
                             </button>
-                          )}
+                          </PermissionGuard>
+                          <PermissionGuard permission="training_add_participant">
+                            {session.status === 'upcoming' && (
+                              <button 
+                                className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
+                                onClick={() => handleAddCustomer(session.id)}
+                              >
+                                添加培训人
+                              </button>
+                            )}
+                          </PermissionGuard>
                         </td>
                       </tr>
                     ))}

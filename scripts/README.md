@@ -1,443 +1,140 @@
-# 脚本工具使用说明
+# 权限管理系统脚本
 
-本目录包含项目的各种实用脚本工具。
+这个目录包含用于管理和维护权限系统的 SQL 脚本。
 
----
+## 脚本列表
 
-## 📂 脚本列表
+### 0. sync-permissions-to-database.sql
+**用途**：同步前端权限定义到数据库
 
-### 1. 数据库备份脚本
+**功能**：
+- 检查数据库中现有的权限
+- 插入所有前端定义的权限（如果不存在）
+- 更新已存在权限的名称和描述
+- 验证同步结果
+- 检查无效的用户权限引用
 
-提供了三种数据库备份方式，你可以根据自己的环境选择：
+**使用场景**：
+- 权限管理页面出现 `FOREIGN_KEY_VIOLATION` 错误
+- 前端添加了新的权限定义
+- 数据库权限数据不完整或损坏
 
-1. **Node.js 脚本**（推荐，跨平台）
-2. **PowerShell 脚本**（Windows）
-3. **Bash 脚本**（Linux/Mac）
-
-### 2. 代码同步脚本 ⭐ 新增
-
-用于同时推送代码到 GitHub 和 Gitee，支持多平台部署。
-
----
-
-## 🔄 代码同步脚本
-
-### sync-to-gitee.ps1 / sync-to-gitee.sh
-
-**用途**: 一键同步代码到 GitHub 和 Gitee
-
-**使用场景**:
-- 同时部署到 Netlify（GitHub）和 EdgeOne（Gitee）
-- 保持两个平台代码同步
-- 简化推送流程
-
-### Windows 使用方法
-
-```powershell
-# 基本用法
-.\scripts\sync-to-gitee.ps1 "你的提交信息"
-
-# 示例
-.\scripts\sync-to-gitee.ps1 "feat: 添加新功能"
-.\scripts\sync-to-gitee.ps1 "fix: 修复登录问题"
-.\scripts\sync-to-gitee.ps1 "docs: 更新文档"
-```
-
-### Linux/Mac 使用方法
-
+**如何使用**：
 ```bash
-# 添加执行权限（首次使用）
-chmod +x scripts/sync-to-gitee.sh
-
-# 基本用法
-./scripts/sync-to-gitee.sh "你的提交信息"
-
-# 示例
-./scripts/sync-to-gitee.sh "feat: 添加新功能"
-./scripts/sync-to-gitee.sh "fix: 修复登录问题"
-./scripts/sync-to-gitee.sh "docs: 更新文档"
+# 在 Supabase Dashboard 的 SQL Editor 中运行
+scripts/sync-permissions-to-database.sql
 ```
 
-### 首次配置
+### 1. check-permissions-status.sql
+**用途**：检查权限系统的当前状态
 
-在使用同步脚本前，需要先添加 Gitee 远程仓库：
+**功能**：
+- 检查权限系统表是否存在
+- 统计功能面板和权限的数量
+- 显示各角色的权限和功能面板访问情况
+- 列出业务员缺失的默认权限和功能面板
 
+**使用场景**：
+- 诊断权限问题
+- 验证迁移是否成功
+- 定期检查系统健康状态
+
+**如何使用**：
 ```bash
-# 添加 Gitee 远程仓库
-git remote add gitee https://gitee.com/your-username/training-management-system.git
-
-# 验证配置
-git remote -v
-
-# 应该看到：
-# origin    https://github.com/lpx0007/training-management-system.git (fetch)
-# origin    https://github.com/lpx0007/training-management-system.git (push)
-# gitee     https://gitee.com/your-username/training-management-system.git (fetch)
-# gitee     https://gitee.com/your-username/training-management-system.git (push)
+# 在 Supabase Dashboard 的 SQL Editor 中运行
+scripts/check-permissions-status.sql
 ```
 
-### 脚本功能
+### 2. fix-salesperson-permissions.sql
+**用途**：修复业务员的权限和功能面板访问
 
-1. ✅ 自动添加所有更改（`git add .`）
-2. ✅ 提交更改（`git commit`）
-3. ✅ 推送到 GitHub（触发 Netlify 部署）
-4. ✅ 推送到 Gitee（触发 EdgeOne 部署）
-5. ✅ 显示部署状态和访问链接
+**功能**：
+- 为所有业务员添加默认权限（8个）
+- 为所有业务员添加默认功能面板访问（6个）
+- 显示修复后的验证结果
 
-### 自动化同步（可选）
+**使用场景**：
+- 业务员登录后功能面板为空
+- 业务员缺少默认权限
+- 新创建的业务员需要初始化权限
 
-如果希望推送到 GitHub 时自动同步到 Gitee，可以使用 GitHub Actions：
-
-查看 `.github/workflows/sync-to-gitee.yml` 配置文件。
-
-**配置步骤**：
-1. 在 Gitee 生成 SSH 密钥
-2. 在 GitHub 仓库设置中添加 Secret：`GITEE_PRIVATE_KEY`
-3. 推送代码到 GitHub 时会自动同步到 Gitee
-
-详细说明请参考：[EdgeOne 部署指南](../docs/EDGEONE_DEPLOYMENT.md)
-
----
-
-## 💾 数据库备份脚本
-
-## 方法 1: Node.js 脚本（推荐）
-
-### 优点
-- ✅ 跨平台（Windows/Linux/Mac）
-- ✅ 不需要安装 PostgreSQL
-- ✅ 使用现有的 Supabase 配置
-- ✅ 自动清理旧备份
-
-### 使用步骤
-
-#### 1. 确保已安装依赖
-
+**如何使用**：
 ```bash
-npm install
+# 在 Supabase Dashboard 的 SQL Editor 中运行
+scripts/fix-salesperson-permissions.sql
 ```
 
-#### 2. 配置环境变量
+### 3. test-permission-system.sql
+**用途**：测试权限系统的完整性
 
-确保 `.env` 文件中有以下配置：
+**功能**：
+- 测试权限查询
+- 测试功能面板访问查询
+- 验证权限系统的各个组件
 
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
-```
+**使用场景**：
+- 开发和测试阶段
+- 验证权限系统是否正常工作
 
-或者添加 Service Role Key（更完整的权限）：
-
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
-
-#### 3. 运行备份脚本
-
+**如何使用**：
 ```bash
-node scripts/backup-database.js
+# 在 Supabase Dashboard 的 SQL Editor 中运行
+scripts/test-permission-system.sql
 ```
 
-### 输出
+## 常见使用流程
 
-- **最新备份**: `database-backup-current.sql`（始终是最新的）
-- **历史备份**: `database-backups/backup_YYYYMMDD_HHMMSS.sql`
-- **自动清理**: 保留最近 10 个历史备份
+### 场景1：业务员功能面板为空
 
----
-
-## 方法 2: PowerShell 脚本（Windows）
-
-### 前提条件
-
-1. 安装 Supabase CLI:
-   ```powershell
-   npm install -g supabase
+1. 运行检查脚本诊断问题：
+   ```sql
+   scripts/check-permissions-status.sql
    ```
 
-2. 登录 Supabase:
-   ```powershell
-   supabase login
+2. 如果发现业务员缺少权限或功能面板访问，运行修复脚本：
+   ```sql
+   scripts/fix-salesperson-permissions.sql
    ```
 
-3. 安装 PostgreSQL（可选，用于 pg_dump）
+3. 让业务员重新登录验证
 
-### 使用步骤
+### 场景2：新部署环境初始化
 
-```powershell
-.\scripts\backup-database.ps1
-```
-
-**注意**: 如果没有安装 PostgreSQL，脚本会提示使用 Node.js 版本。
-
----
-
-## 方法 3: Bash 脚本（Linux/Mac）
-
-### 前提条件
-
-1. 安装 Supabase CLI:
-   ```bash
-   npm install -g supabase
+1. 运行完整的迁移脚本：
+   ```sql
+   supabase-migrations/permission-management-setup.sql
    ```
 
-2. 登录 Supabase:
-   ```bash
-   supabase login
+2. 运行检查脚本验证：
+   ```sql
+   scripts/check-permissions-status.sql
    ```
 
-3. 安装 PostgreSQL（用于 pg_dump）:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install postgresql-client
-   
-   # macOS
-   brew install postgresql
-   ```
+3. 如果有问题，运行相应的修复脚本
 
-### 使用步骤
+### 场景3：定期健康检查
 
-```bash
-# 添加执行权限
-chmod +x scripts/backup-database.sh
-
-# 运行脚本
-./scripts/backup-database.sh
+定期（如每周）运行检查脚本，确保权限系统正常：
+```sql
+scripts/check-permissions-status.sql
 ```
 
----
+## 注意事项
 
-## 自动化备份
+1. **备份数据**：在运行任何修改数据的脚本之前，建议先备份数据库
+2. **测试环境**：建议先在测试环境中运行脚本，确认无误后再在生产环境运行
+3. **权限要求**：运行这些脚本需要数据库管理员权限
+4. **幂等性**：修复脚本使用 `ON CONFLICT DO NOTHING` 或 `ON CONFLICT DO UPDATE`，可以安全地多次运行
 
-### 方法 1: 使用 npm scripts
+## 相关文档
 
-在 `package.json` 中添加：
-
-```json
-{
-  "scripts": {
-    "backup": "node scripts/backup-database.js",
-    "backup:daily": "node scripts/backup-database.js"
-  }
-}
-```
-
-然后运行：
-
-```bash
-npm run backup
-```
-
-### 方法 2: 使用 Windows 任务计划程序
-
-1. 打开"任务计划程序"
-2. 创建基本任务
-3. 触发器：每天
-4. 操作：启动程序
-   - 程序：`node`
-   - 参数：`E:\培训机构业务通\scripts\backup-database.js`
-   - 起始于：`E:\培训机构业务通`
-
-### 方法 3: 使用 Linux Cron
-
-编辑 crontab：
-
-```bash
-crontab -e
-```
-
-添加每天凌晨 2 点执行备份：
-
-```cron
-0 2 * * * cd /path/to/project && node scripts/backup-database.js >> backup.log 2>&1
-```
-
----
-
-## 备份文件说明
-
-### 文件结构
-
-```
-project/
-├── database-backup-current.sql          # 最新备份（始终更新）
-├── database-backups/                    # 历史备份目录
-│   ├── backup_20250127_143022.sql
-│   ├── backup_20250126_143022.sql
-│   └── ...                              # 保留最近 10 个
-└── scripts/
-    ├── backup-database.js               # Node.js 备份脚本
-    ├── backup-database.ps1              # PowerShell 备份脚本
-    └── backup-database.sh               # Bash 备份脚本
-```
-
-### 备份内容
-
-每个备份文件包含：
-
-- ✅ 所有表结构（CREATE TABLE）
-- ✅ 所有索引（CREATE INDEX）
-- ✅ 所有约束（PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK）
-- ✅ 所有触发器（CREATE TRIGGER）
-- ✅ 所有 RLS 策略（CREATE POLICY）
-- ✅ 默认数据（INSERT INTO permissions）
-- ✅ 时间戳和项目信息
-
-### 不包含的内容
-
-- ❌ 用户数据（只有结构，不包含数据）
-- ❌ auth.users 表（由 Supabase 管理）
-
----
-
-## 恢复数据库
-
-### 从备份恢复
-
-1. 在 Supabase Dashboard 中打开 SQL Editor
-2. 复制备份文件的内容
-3. 执行 SQL
-
-或者使用 psql：
-
-```bash
-psql "your_database_url" < database-backup-current.sql
-```
-
-### 注意事项
-
-- ⚠️ 恢复会删除现有表（因为使用了 `DROP TABLE IF EXISTS`）
-- ⚠️ 建议在新项目中测试恢复
-- ⚠️ 恢复前请确保有完整备份
-
----
-
-## 故障排除
-
-### 问题 1: "未找到 Supabase 配置"
-
-**解决方案**: 确保 `.env` 文件存在且包含正确的配置：
-
-```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
-
-### 问题 2: "连接失败"
-
-**解决方案**: 
-1. 检查网络连接
-2. 确认 Supabase 项目状态（是否暂停）
-3. 验证 API 密钥是否正确
-
-### 问题 3: "权限不足"
-
-**解决方案**: 使用 Service Role Key 而不是 Anon Key：
-
-```env
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-Service Role Key 可以在 Supabase Dashboard > Project Settings > API 中找到。
-
-### 问题 4: Windows 上无法运行 .sh 脚本
-
-**解决方案**: 
-1. 使用 PowerShell 脚本：`.\scripts\backup-database.ps1`
-2. 或使用 Node.js 脚本：`node scripts/backup-database.js`
-3. 或安装 Git Bash 来运行 .sh 脚本
-
----
-
-## 最佳实践
-
-### 1. 定期备份
-
-- ✅ 每天自动备份一次
-- ✅ 重大更改前手动备份
-- ✅ 部署前备份
-
-### 2. 备份存储
-
-- ✅ 保留最近 10 个本地备份
-- ✅ 定期上传到云存储（Google Drive, OneDrive, etc.）
-- ✅ 使用版本控制（Git）管理备份模板
-
-### 3. 测试恢复
-
-- ✅ 定期测试备份恢复流程
-- ✅ 在测试环境中验证备份完整性
-- ✅ 记录恢复时间和步骤
-
-### 4. 安全性
-
-- ⚠️ 不要将备份文件提交到公共 Git 仓库
-- ⚠️ 备份文件可能包含敏感的数据库结构信息
-- ⚠️ 使用 `.gitignore` 排除 `database-backups/` 目录
-
----
-
-## 更新备份模板
-
-如果数据库结构发生重大变化，需要更新备份模板：
-
-### 方法 1: 手动更新
-
-1. 在 Supabase Dashboard 中查看最新的表结构
-2. 手动编辑 `database-backup-current.sql`
-3. 运行备份脚本验证
-
-### 方法 2: 使用 pg_dump（推荐）
-
-```bash
-# 获取数据库连接字符串
-# 从 Supabase Dashboard > Project Settings > Database
-
-pg_dump "your_database_url" \
-  --schema=public \
-  --schema-only \
-  --no-owner \
-  --no-acl \
-  --clean \
-  --if-exists \
-  > database-backup-current.sql
-```
-
-### 方法 3: 使用 Supabase CLI
-
-```bash
-supabase db dump --project-ref qinpsvempgjjocjfjvpc > database-backup-current.sql
-```
-
----
-
-## 相关文件
-
-- `database-backup-current.sql` - 当前数据库结构备份
-- `scripts/backup-database.js` - Node.js 备份脚本
-- `scripts/backup-database.ps1` - PowerShell 备份脚本
-- `scripts/backup-database.sh` - Bash 备份脚本
-- `.gitignore` - 排除备份目录
-
----
+- [权限管理系统快速开始指南](../PERMISSION_SYSTEM_QUICKSTART.md)
+- [修复业务员权限指南](../docs/FIX_SALESPERSON_PERMISSIONS.md)
+- [权限管理系统实现总结](../PERMISSION_SYSTEM_IMPLEMENTATION_SUMMARY.md)
 
 ## 支持
 
-如果遇到问题：
-
-1. 查看脚本输出的错误信息
-2. 检查 Supabase Dashboard 中的项目状态
-3. 验证环境变量配置
-4. 查看本文档的故障排除部分
-
----
-
-## 更新日志
-
-### 2025-01-27
-- ✅ 创建 Node.js 备份脚本
-- ✅ 创建 PowerShell 备份脚本
-- ✅ 创建 Bash 备份脚本
-- ✅ 添加自动清理旧备份功能
-- ✅ 添加使用文档
+如果遇到问题，请：
+1. 查看相关文档
+2. 运行检查脚本获取详细信息
+3. 联系技术支持并提供检查脚本的输出结果

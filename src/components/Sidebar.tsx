@@ -1,16 +1,9 @@
 import { useContext, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '@/contexts/authContext';
-import { BarChart2, Calendar, UserCheck, DollarSign, Users, Database, GraduationCap, Shield, Settings, Megaphone, Image, FileText } from 'lucide-react';
-import dataService from '@/lib/dataService';
+import { BarChart2, Calendar, UserCheck, DollarSign, Users, Database, Shield, Settings, Image, FileText, History, GraduationCap } from 'lucide-react';
+import { MENU_FEATURES } from '@/constants/menuFeatures';
 import { generateDefaultAvatar } from '@/utils/imageUtils';
-
-interface NavItem {
-  icon: React.ReactNode;
-  label: string;
-  path: string;
-  permission?: string[];
-}
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -18,92 +11,51 @@ interface SidebarProps {
   currentPath?: string;
 }
 
+// 图标映射
+const iconMap: Record<string, React.ReactNode> = {
+  'chart-line': <BarChart2 size={20} />,
+  'users': <Users size={20} />,
+  'calendar': <Calendar size={20} />,
+  'user-tie': <UserCheck size={20} />,
+  'user-friends': <Users size={20} />,
+  'file-alt': <FileText size={20} />,
+  'image': <Image size={20} />,
+  'database': <Database size={20} />,
+  'chart-bar': <DollarSign size={20} />,
+  'shield-alt': <Shield size={20} />,
+  'history': <History size={20} />,
+  'cog': <Settings size={20} />,
+};
+
 const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath }: SidebarProps) => {
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout, canAccessMenu, hasAnyPermission } = useContext(AuthContext);
   const location = useLocation();
   const [activePath, setActivePath] = useState<string>(currentPath || location.pathname);
-  const [salespersonPermissions, setSalespersonPermissions] = useState<string[]>([]);
-
-  // 获取业务员的权限列表
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      if (user?.role === 'salesperson') {
-        try {
-          const salespersons = await dataService.getSalespersons();
-          const currentSalesperson = salespersons.find(s => s.name === user.name);
-          const permissions = (currentSalesperson as any)?.permissions;
-          if (permissions && Array.isArray(permissions)) {
-            setSalespersonPermissions(permissions);
-          } else {
-            // 如果没有找到权限，设置默认权限
-            console.warn('未找到业务员权限，使用默认权限');
-            setSalespersonPermissions(['dashboard_access', 'training_view', 'customer_view']);
-          }
-        } catch (error) {
-          console.error('获取业务员权限失败:', error);
-          // 即使获取失败，也设置默认权限，确保菜单可以显示
-          setSalespersonPermissions(['dashboard_access', 'training_view', 'customer_view']);
-        }
-      }
-    };
-    
-    if (user) {
-      fetchPermissions();
-    }
-  }, [user]);
-
-  // 统一的导航菜单配置，包含权限控制
-  const navItems: NavItem[] = [
-    { icon: <BarChart2 size={20} />, label: '仪表盘', path: '/dashboard', permission: ['admin', 'salesperson', 'expert'] },
-    { icon: <Calendar size={20} />, label: '培训计划', path: '/training-performance', permission: ['admin', 'salesperson', 'expert'] },
-    { icon: <UserCheck size={20} />, label: '专家管理', path: '/expert-management', permission: ['admin'] },
-    { icon: <DollarSign size={20} />, label: '销售追踪', path: '/sales-tracking', permission: ['admin'] },
-    { icon: <Users size={20} />, label: '客户管理', path: '/customer-management', permission: ['admin', 'salesperson'] },
-    { icon: <Image size={20} />, label: '海报生成', path: '/poster-generator', permission: ['admin'] },
-    { icon: <Database size={20} />, label: '数据管理', path: '/data-management', permission: ['admin'] },
-    { icon: <Users size={20} />, label: '业务员管理', path: '/salesperson-management', permission: ['admin'] },
-    { icon: <Megaphone size={20} />, label: '公告管理', path: '/announcement-management', permission: ['admin'] },
-    { icon: <Shield size={20} />, label: '权限管理', path: '/permission-management', permission: ['admin'] },
-    { icon: <FileText size={20} />, label: '招商简章', path: '/prospectus-management', permission: ['admin'] },
-    { icon: <Settings size={20} />, label: '个人设置', path: '/profile-settings', permission: ['admin', 'salesperson', 'expert'] }
-  ];
   
   // 监听路径变化，确保activePath始终正确
   useEffect(() => {
-    // 确保即使currentPath为空，也能使用location.pathname
     const newPath = currentPath || location.pathname;
     if (newPath !== activePath) {
       setActivePath(newPath);
     }
   }, [currentPath, location.pathname, activePath]);
 
-  // 根据用户角色和权限过滤导航项
-  const filteredNavItems = navItems.filter(item => {
-    // 如果没有指定权限，则所有角色都可以访问
-    if (!item.permission) return true;
-    
-    // 检查用户角色是否在允许的权限列表中
-    if (user && item.permission.includes(user.role)) {
-                       // 对于业务员，还需要检查具体的权限
-                       if (user.role === 'salesperson') {
-                         // 根据用户的具体权限决定是否显示菜单项
-                         const permissionMap: Record<string, string> = {
-                           '/dashboard': 'dashboard_access',
-                           '/training-performance': 'training_view',
-                           '/customer-management': 'customer_view',
-                           '/sales-tracking': 'sales_tracking_view',
-                           '/data-export': 'data_export'
-                         };
-                         
-                         // 检查是否有对应权限或是否为基础功能（包括个人设置）
-                         return salespersonPermissions.includes(permissionMap[item.path] || '') || 
-                                ['/dashboard', '/training-performance', '/customer-management', '/profile-settings'].includes(item.path);
-                       }
-      return true;
+  // 根据功能面板访问权限和具体权限过滤菜单项
+  const filteredMenuItems = MENU_FEATURES.filter(feature => {
+    // 1. 检查功能面板是否启用
+    if (!canAccessMenu(feature.id)) {
+      return false;
     }
     
-    return false;
-  });
+    // 2. 检查是否有所需的权限（如果有要求的话）
+    if (feature.requiredPermissions.length > 0) {
+      // 需要任一权限即可
+      return hasAnyPermission(feature.requiredPermissions);
+    }
+    
+    // 没有权限要求的功能面板（如仪表盘、个人设置）
+    return true;
+  }).sort((a, b) => a.displayOrder - b.displayOrder);
 
   const handleLogout = () => {
     logout();
@@ -142,20 +94,21 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath }: SidebarProps) => 
 
         <nav className="flex-1 overflow-y-auto p-4">
           <ul className="space-y-1">
-            {filteredNavItems.map((item) => (
-              <li key={item.path}>
+            {filteredMenuItems.map((feature) => (
+              <li key={feature.id}>
                 <Link
-                  to={item.path}
-                  onClick={() => handleNavClick(item.path)}
+                  to={feature.path}
+                  onClick={() => handleNavClick(feature.path)}
                   className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    item.path === activePath
+                    feature.path === activePath
                       ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                   }`}
-                  aria-current={item.path === activePath ? "page" : undefined}
+                  aria-current={feature.path === activePath ? "page" : undefined}
+                  title={feature.description}
                 >
-                  <span className="mr-3">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="mr-3">{iconMap[feature.icon] || <Settings size={20} />}</span>
+                  <span>{feature.name}</span>
                 </Link>
               </li>
             ))}

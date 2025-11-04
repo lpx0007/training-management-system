@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
+import { PermissionGuard } from '@/components/PermissionGuard';
 import { toast } from 'sonner';
 import prospectusService from '@/lib/supabase/prospectusService';
 import { supabase } from '@/lib/supabase/client';
@@ -235,7 +236,7 @@ export default function ProspectusManagement() {
                 <i className="fas fa-bell"></i>
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
-              {user?.role === 'admin' && (
+              <PermissionGuard permission="prospectus_upload">
                 <button 
                   onClick={openUploadModal}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
@@ -243,7 +244,7 @@ export default function ProspectusManagement() {
                   <Plus size={16} className="mr-2" />
                   上传简章
                 </button>
-              )}
+              </PermissionGuard>
             </div>
           </div>
         </header>
@@ -415,27 +416,33 @@ export default function ProspectusManagement() {
                           {getStatusBadge(prospectus.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button 
-                            onClick={() => openEditModal(prospectus)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3"
-                            title="编辑"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button 
-                            onClick={() => openAdaptCoursesModal(prospectus)}
-                            className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3"
-                            title="适配课程"
-                          >
-                            <i className="fas fa-link"></i>
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(prospectus)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                            title="删除"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <PermissionGuard permission="prospectus_edit">
+                            <button 
+                              onClick={() => openEditModal(prospectus)}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3"
+                              title="编辑"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          </PermissionGuard>
+                          <PermissionGuard permission="prospectus_edit">
+                            <button 
+                              onClick={() => openAdaptCoursesModal(prospectus)}
+                              className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3"
+                              title="适配课程"
+                            >
+                              <i className="fas fa-link"></i>
+                            </button>
+                          </PermissionGuard>
+                          <PermissionGuard permission="prospectus_delete">
+                            <button 
+                              onClick={() => handleDelete(prospectus)}
+                              className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                              title="删除"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </PermissionGuard>
                         </td>
                       </tr>
                     ))}

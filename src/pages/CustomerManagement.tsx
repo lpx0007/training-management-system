@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
+import { PermissionGuard } from '@/components/PermissionGuard';
 import { toast } from 'sonner';
 import { generateDefaultAvatar } from '@/utils/imageUtils';
 
@@ -490,15 +491,17 @@ export default function CustomerManagement() {
               <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative"><i className="fas fa-bell"></i>
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={openAddModal}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
-              >
-                <Plus size={16} className="mr-2" />
-                添加客户
-              </motion.button>
+              <PermissionGuard permission="customer_add">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={openAddModal}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
+                >
+                  <Plus size={16} className="mr-2" />
+                  添加客户
+                </motion.button>
+              </PermissionGuard>
             </div>
           </div>
 
@@ -1087,35 +1090,39 @@ export default function CustomerManagement() {
                           </button>
                           {user?.role === 'admin' || user?.name === customer.salesperson ? (
                             <>
-                              <button
-                                onClick={() => openEditModal(customer)}
-                                className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3"
-                              >
-                                编辑
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  if (window.confirm(`确定要删除客户 ${customer.name} 吗？`)) {
-                                    try {
-                                      const success = await supabaseService.deleteCustomer(customer.id);
-                                      if (success) {
-                                        toast.success('客户已成功删除');
-                                        // 立即从列表中移除
-                                        setAllCustomers(prev => prev.filter(c => c.id !== customer.id));
-                                        setFilteredCustomers(prev => prev.filter(c => c.id !== customer.id));
-                                      } else {
-                                        toast.error('删除客户失败');
+                              <PermissionGuard permission="customer_edit">
+                                <button
+                                  onClick={() => openEditModal(customer)}
+                                  className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3"
+                                >
+                                  编辑
+                                </button>
+                              </PermissionGuard>
+                              <PermissionGuard permission="customer_delete">
+                                <button
+                                  onClick={async () => {
+                                    if (window.confirm(`确定要删除客户 ${customer.name} 吗？`)) {
+                                      try {
+                                        const success = await supabaseService.deleteCustomer(customer.id);
+                                        if (success) {
+                                          toast.success('客户已成功删除');
+                                          // 立即从列表中移除
+                                          setAllCustomers(prev => prev.filter(c => c.id !== customer.id));
+                                          setFilteredCustomers(prev => prev.filter(c => c.id !== customer.id));
+                                        } else {
+                                          toast.error('删除客户失败');
+                                        }
+                                      } catch (error) {
+                                        console.error('删除客户时出错:', error);
+                                        toast.error('删除客户失败，请重试');
                                       }
-                                    } catch (error) {
-                                      console.error('删除客户时出错:', error);
-                                      toast.error('删除客户失败，请重试');
                                     }
-                                  }
-                                }}
-                                className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                              >
-                                删除
-                              </button>
+                                  }}
+                                  className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                                >
+                                  删除
+                                </button>
+                              </PermissionGuard>
                             </>
                           ) : null}
                         </td>
