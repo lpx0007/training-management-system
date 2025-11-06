@@ -1,6 +1,6 @@
 export type AnnouncementPriority = 'urgent' | 'important' | 'normal';
 export type AnnouncementStatus = 'active' | 'archived' | 'draft';
-export type UserRole = 'admin' | 'salesperson' | 'expert';
+export type UserRole = 'admin' | 'salesperson' | 'expert' | 'manager';
 
 export interface Announcement {
   id: string;

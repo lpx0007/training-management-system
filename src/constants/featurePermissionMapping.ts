@@ -31,6 +31,7 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'customer_add',
       'customer_edit',
       'customer_delete',
+      'customer_import',
       'customer_export',
     ],
     description: '客户管理页面的所有操作权限'
@@ -45,6 +46,8 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'training_add_participant',
       'training_manage_participant',
       'training_view_stats',
+      'training_import',
+      'training_export',
       // 跨功能权限：培训详情中可以下载招商简章
       'prospectus_download',
       // 跨功能权限：培训详情中可以查看专家信息
@@ -61,6 +64,8 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'expert_delete',
       'expert_view_feedback',
       'expert_profile_edit',
+      'expert_import',
+      'expert_export',
     ],
     description: '专家管理页面的所有操作权限'
   },
@@ -72,6 +77,8 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'salesperson_edit',
       'salesperson_delete',
       'salesperson_view_performance',
+      'salesperson_import',
+      'salesperson_export',
     ],
     description: '业务员管理页面的所有操作权限'
   },
@@ -84,6 +91,8 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'prospectus_delete',
       'prospectus_download',
       'prospectus_manage_category',
+      'prospectus_import',
+      'prospectus_export',
     ],
     description: '招商简章管理页面的所有操作权限（管理员专用）'
   },
@@ -99,12 +108,22 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
   {
     featureId: 'data_management',
     permissions: [
-      'data_import',
-      'data_export',
+      // 各模块的导入导出权限
+      'customer_import',
+      'customer_export',
+      'training_import',
+      'training_export',
+      'expert_import',
+      'expert_export',
+      'salesperson_import',
+      'salesperson_export',
+      'prospectus_import',
+      'prospectus_export',
+      // 通用数据管理权限
       'data_download_template',
       'data_view_history',
     ],
-    description: '数据管理页面的所有操作权限'
+    description: '数据管理页面的所有操作权限，根据用户拥有的细分权限显示对应的导入导出选项'
   },
   {
     featureId: 'sales_tracking',

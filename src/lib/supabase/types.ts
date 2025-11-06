@@ -4,7 +4,7 @@
  */
 
 // 用户角色类型
-export type UserRole = 'admin' | 'salesperson' | 'expert';
+export type UserRole = 'admin' | 'salesperson' | 'expert' | 'manager';
 
 // 用户资料
 export interface UserProfile {
@@ -13,6 +13,7 @@ export interface UserProfile {
   role: UserRole;
   name: string;
   department: string | null;
+  department_id?: number | null;  // 部门ID（经理角色使用）
   
   // 状态字段
   status: 'enabled' | 'disabled';  // 账号状态（控制登录）
@@ -165,6 +166,9 @@ export interface TrainingSession {
   course_id: string | null;
   course_description: string | null;
   prospectus_id: number | null;  // 招商简章ID
+  training_mode: string | null;  // 培训模式：online/offline/mixed
+  online_price: number | null;   // 线上价格
+  offline_price: number | null;  // 线下价格
   created_at: string;
 }
 
@@ -196,6 +200,8 @@ export interface TrainingParticipant {
   registration_date: string | null;
   payment_status: string | null;
   salesperson_name: string | null;
+  participation_mode: string | null;  // 参与方式：online/offline
+  payment_amount: number | null;      // 付款金额
   created_at: string;
 }
 
@@ -210,6 +216,8 @@ export interface TrainingParticipantFrontend {
   registrationDate: string | null;
   paymentStatus: string | null;
   salespersonName: string | null;
+  participationMode: string | null;   // 参与方式：online/offline
+  paymentAmount: number | null;       // 付款金额
   createdAt: string;
 }
 
@@ -281,6 +289,9 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     courseId: dbSession.course_id,
     courseDescription: dbSession.course_description,
     prospectusId: dbSession.prospectus_id,
+    training_mode: dbSession.training_mode,
+    online_price: dbSession.online_price,
+    offline_price: dbSession.offline_price,
     createdAt: dbSession.created_at,
     participantsList: []
   };
@@ -297,6 +308,8 @@ export function dbToFrontendTrainingParticipant(dbParticipant: TrainingParticipa
     registrationDate: dbParticipant.registration_date,
     paymentStatus: dbParticipant.payment_status,
     salespersonName: dbParticipant.salesperson_name,
+    participationMode: dbParticipant.participation_mode,
+    paymentAmount: dbParticipant.payment_amount,
     createdAt: dbParticipant.created_at
   };
 }

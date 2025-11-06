@@ -31,7 +31,6 @@ export const PERMISSION_CATEGORIES: Record<string, PermissionCategory> = {
       { id: 'customer_add', name: '添加客户', description: '添加新客户到系统' },
       { id: 'customer_edit', name: '编辑客户', description: '编辑客户信息' },
       { id: 'customer_delete', name: '删除客户', description: '删除客户记录' },
-      { id: 'customer_export', name: '导出客户', description: '导出客户数据' },
     ]
   },
   TRAINING: {
@@ -99,12 +98,26 @@ export const PERMISSION_CATEGORIES: Record<string, PermissionCategory> = {
   DATA: {
     id: 'data',
     name: '数据管理',
-    description: '数据导入导出和管理权限',
+    description: '数据批量操作和管理权限',
     permissions: [
-      { id: 'data_import', name: '导入数据', description: '批量导入数据' },
-      { id: 'data_export', name: '导出数据', description: '导出系统数据' },
-      { id: 'data_download_template', name: '下载模板', description: '下载数据导入模板' },
-      { id: 'data_view_history', name: '查看数据管理历史', description: '查看数据操作历史' },
+      // 客户数据导入导出
+      { id: 'customer_import', name: '导入客户', description: '批量导入客户数据' },
+      { id: 'customer_export', name: '导出客户', description: '导出客户数据' },
+      // 培训数据导入导出
+      { id: 'training_import', name: '导入培训班次', description: '批量导入培训班次数据' },
+      { id: 'training_export', name: '导出培训班次', description: '导出培训班次数据' },
+      // 专家数据导入导出
+      { id: 'expert_import', name: '导入专家信息', description: '批量导入专家数据' },
+      { id: 'expert_export', name: '导出专家信息', description: '导出专家数据' },
+      // 业务员数据导入导出
+      { id: 'salesperson_import', name: '导入业务员信息', description: '批量导入业务员数据' },
+      { id: 'salesperson_export', name: '导出业务员信息', description: '导出业务员数据' },
+      // 简章数据导入导出
+      { id: 'prospectus_import', name: '导入简章信息', description: '批量导入简章元数据' },
+      { id: 'prospectus_export', name: '导出简章信息', description: '导出简章元数据' },
+      // 通用功能
+      { id: 'data_download_template', name: '下载导入模板', description: '下载各类数据导入模板' },
+      { id: 'data_view_history', name: '查看数据操作历史', description: '查看数据导入导出历史记录' },
     ]
   },
   SYSTEM: {
@@ -143,11 +156,14 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'customer_view',
     'customer_add',
     'customer_edit',
+    'customer_import',
+    'customer_export',
     'training_view',
     'training_add_participant',
     'expert_view',
     'prospectus_view',
     'prospectus_download',
+    'data_download_template',
   ],
   expert: [
     // 专家基础权限
@@ -155,6 +171,25 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'expert_view',
     'expert_profile_edit',
     'prospectus_view',
+  ],
+  manager: [
+    // 部门经理权限（客户管理）
+    'customer_view',
+    'customer_view_all',
+    'customer_add',
+    'customer_edit',
+    'customer_export',
+    // 培训管理
+    'training_view',
+    'training_view_stats',
+    'training_export',
+    // 业务员管理
+    'salesperson_view',
+    'salesperson_add',
+    'salesperson_edit',
+    'salesperson_view_performance',
+    // 数据管理
+    'data_view_history',
   ]
 };
 

@@ -87,7 +87,14 @@ export const MENU_FEATURES: MenuFeature[] = [
     path: '/data-management',
     icon: 'database',
     description: '批量导入导出数据',
-    requiredPermissions: ['data_import', 'data_export'], // 需要任一权限
+    requiredPermissions: [
+      'customer_import', 'customer_export',
+      'training_import', 'training_export',
+      'expert_import', 'expert_export',
+      'salesperson_import', 'salesperson_export',
+      'prospectus_import', 'prospectus_export',
+      'data_download_template'
+    ], // 拥有任一导入导出权限即可访问
     displayOrder: 8
   },
   {
@@ -156,6 +163,15 @@ export const ROLE_DEFAULT_MENU_FEATURES: Record<UserRole, string[]> = {
     'training_management',
     'expert_management',
     'prospectus_management',
+    'profile_settings',
+  ],
+  manager: [
+    // 部门经理默认功能面板
+    'dashboard',
+    'customer_management',
+    'training_management',
+    'salesperson_management',
+    'data_management',
     'profile_settings',
   ]
 };

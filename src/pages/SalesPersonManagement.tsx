@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useContext, useEffect } from 'react';
+import { AuthContext } from '@/contexts/authContext';
+import { getRoleDefaultPermissions } from '@/constants/permissions';
+import { getRoleDefaultMenuFeatures } from '@/constants/menuFeatures';
+import type { UserRole } from '@/lib/supabase/types';
 import { useTheme } from '@/hooks/useTheme';
+import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { 
   Users, 
@@ -72,6 +76,7 @@ const calculateTeamData = (salespersons: Salesperson[]) => {
 
 export default function SalesPersonManagement() {
   const { theme } = useTheme();
+  const { user } = useContext(AuthContext);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('全部');
@@ -89,8 +94,6 @@ export default function SalesPersonManagement() {
   const [isCustomerDetailModalOpen, setIsCustomerDetailModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   
   // 添加业务员表单状态
   const [newSalespersonForm, setNewSalespersonForm] = useState({
@@ -102,18 +105,10 @@ export default function SalesPersonManagement() {
     team: '',
     join_date: '',
     status: 'enabled' as 'enabled' | 'disabled', // 管理员创建的账号默认为 enabled
-    work_status: 'active' as 'trial' | 'active' | 'vacation' | 'resigned' // 默认为在职
+    work_status: 'active' as 'trial' | 'active' | 'vacation' | 'resigned', // 默认为在职
+    role: 'salesperson' as UserRole  // 添加角色字段，默认为业务员
   });
 
-  // 权限列表（示例数据）
-  const permissions = [
-    { id: 'view_customers', name: '查看客户', description: '查看客户列表和详情' },
-    { id: 'edit_customers', name: '编辑客户', description: '编辑客户信息' },
-    { id: 'view_trainings', name: '查看培训', description: '查看培训列表和详情' },
-    { id: 'create_trainings', name: '创建培训', description: '创建新的培训计划' },
-    { id: 'view_reports', name: '查看报表', description: '查看业绩报表' },
-    { id: 'manage_team', name: '管理团队', description: '管理团队成员' }
-  ];
 
   // 计算图表数据
   const departmentData = calculateDepartmentData(filteredSalespersons);
@@ -137,22 +132,27 @@ export default function SalesPersonManagement() {
   const loadSalespersons = async () => {
     try {
       setIsLoading(true);
-      const baseSalespersons = await supabaseService.getSalespersons();
+      let baseSalespersons = await supabaseService.getSalespersons();
       console.log('📋 从数据库加载的业务员列表:', baseSalespersons);
+      
+      // 如果是部门经理，只显示本部门的业务员
+      if (user?.role === 'manager') {
+        const userProfile = await supabaseService.getUserProfile(user.id);
+        const managerDepartmentId = userProfile?.department_id;
+        
+        if (managerDepartmentId) {
+          baseSalespersons = baseSalespersons.filter(sp => sp.department_id === managerDepartmentId);
+          console.log(`🏢 部门经理 ${user.name} 所在部门ID: ${managerDepartmentId}`);
+          console.log(`📋 过滤后业务员数量: ${baseSalespersons.length}`);
+        }
+      }
+      
       console.log('📋 业务员数量:', baseSalespersons.length);
       console.log('📋 业务员名字列表:', baseSalespersons.map(sp => sp.name));
       
       // 加载所有客户数据
       const allCustomers = await supabaseService.getCustomers();
       console.log('👥 客户总数:', allCustomers.length);
-      
-      // 检查是否有客户的业务员是"小周"
-      const xiaoZhouCustomers = allCustomers.filter(c => c.salesperson_name === '小周');
-      console.log('🔍 业务员"小周"的客户:', xiaoZhouCustomers);
-      
-      // 检查是否有业务员叫"小周"
-      const xiaoZhouSalesperson = baseSalespersons.find(sp => sp.name === '小周');
-      console.log('🔍 业务员"小周"的记录:', xiaoZhouSalesperson);
       
       // 为每个业务员添加绩效数据（从数据库计算）
       const salespersonsWithPerformance: Salesperson[] = baseSalespersons.map(sp => {
@@ -329,6 +329,22 @@ export default function SalesPersonManagement() {
     setIsEditSalespersonModalOpen(true);
   };
   
+  // 职位到角色的映射
+  const positionToRole: Record<string, UserRole> = {
+    '部门经理': 'manager',
+    '销售顾问': 'salesperson',
+    '销售专员': 'salesperson',
+    '业务员': 'salesperson',
+    '专家': 'expert',
+    '培训师': 'expert',
+    '讲师': 'expert',
+  };
+
+  // 获取职位对应的角色
+  const getRoleFromPosition = (position: string): UserRole | null => {
+    return positionToRole[position] || null;
+  };
+
   const saveSalespersonEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedSalesperson) return;
@@ -346,11 +362,16 @@ export default function SalesPersonManagement() {
     const status = formData.get('status') as 'enabled' | 'disabled';
     const workStatus = formData.get('work_status') as 'trial' | 'active' | 'vacation' | 'resigned';
     
-    // 构建更新对象，将空字符串转换为 undefined（让数据库保持原值）或 null（清空字段）
+    // 检查职位是否变更并获取新角色
+    const newRole = getRoleFromPosition(position);
+    const currentRole = selectedSalesperson.role || 'salesperson';
+    const roleChanged = newRole && newRole !== currentRole;
+    
+    // 构建更新对象
     const updates: any = {
-      name: name,  // 必填，不会为空
+      name: name,
       position: position || null,
-      phone: phone,  // 必填，不会为空
+      phone: phone,
       email: email || null,
       department: department || null,
       team: team || null,
@@ -359,12 +380,41 @@ export default function SalesPersonManagement() {
       work_status: workStatus,
     };
     
+    // 如果角色变更，添加role字段
+    if (roleChanged && newRole) {
+      updates.role = newRole;
+    }
+    
     console.log('=== 开始保存业务员信息 ===');
     console.log('更新数据:', updates);
+    console.log('角色变更:', roleChanged, '新角色:', newRole);
     
     try {
+      // 更新用户基本信息
       await supabaseService.updateSalesperson(selectedSalesperson.id, updates);
-      toast.success('业务员信息已更新');
+      
+      // 如果角色变更，更新权限和菜单访问
+      if (roleChanged && newRole) {
+        console.log('检测到角色变更，正在更新权限...');
+        
+        // 获取新角色的默认权限和菜单
+        const defaultPermissions = getRoleDefaultPermissions(newRole);
+        const defaultMenuFeatures = getRoleDefaultMenuFeatures(newRole);
+        
+        console.log('新角色默认权限:', defaultPermissions);
+        console.log('新角色默认菜单:', defaultMenuFeatures);
+        
+        // 更新权限
+        await supabaseService.updateUserPermissions(selectedSalesperson.id, defaultPermissions);
+        
+        // 更新菜单访问
+        await supabaseService.updateUserMenuAccess(selectedSalesperson.id, defaultMenuFeatures);
+        
+        toast.success(`已将 ${name} 提拔为${position}，并更新相应权限`);
+      } else {
+        toast.success('业务员信息已更新');
+      }
+      
       setIsEditSalespersonModalOpen(false);
       // 重新加载数据
       await loadSalespersons();
@@ -377,28 +427,6 @@ export default function SalesPersonManagement() {
         details: error.details
       });
       toast.error(error.message || '保存失败，请重试');
-    }
-  };
-
-  // 打开权限设置模态框
-  const openPermissionModal = (salesperson: Salesperson) => {
-    setSelectedSalesperson(salesperson);
-    setSelectedPermissions([]);
-    setIsPermissionModalOpen(true);
-  };
-
-  // 保存权限设置
-  const savePermissions = async () => {
-    if (!selectedSalesperson) return;
-    
-    try {
-      // TODO: 实现权限更新功能
-      // await supabaseService.updateSalespersonPermissions(selectedSalesperson.id, selectedPermissions);
-      toast.success('权限已更新（功能开发中）');
-      setIsPermissionModalOpen(false);
-    } catch (error) {
-      console.error('保存权限失败:', error);
-      toast.error('保存失败，请重试');
     }
   };
 
@@ -699,7 +727,7 @@ export default function SalesPersonManagement() {
           </div>
 
           {/* 筛选和搜索区域 */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 mb-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex-1 relative">
                 <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -1015,12 +1043,6 @@ export default function SalesPersonManagement() {
                                  编辑
                                </button>
                               <button 
-                                onClick={() => openPermissionModal(salesperson)}
-                                className="text-purple-600 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300 mr-3"
-                              >
-                                权限
-                              </button>
-                              <button 
                                 onClick={() => handleDelete(salesperson.id)}
                                 className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                               >
@@ -1319,14 +1341,38 @@ export default function SalesPersonManagement() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">职位</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">职位/角色 *</label>
+                    <select
                       value={newSalespersonForm.position}
-                      onChange={(e) => setNewSalespersonForm({ ...newSalespersonForm, position: e.target.value })}
+                      onChange={(e) => {
+                        const positionSelect = e.target;
+                        const role = getRoleFromPosition(positionSelect.value);
+                        if (role) {
+                          setNewSalespersonForm({ ...newSalespersonForm, position: positionSelect.value, role });
+                        } else {
+                          setNewSalespersonForm({ ...newSalespersonForm, position: positionSelect.value });
+                        }
+                      }}
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="请输入职位"
-                    />
+                      required
+                    >
+                      <optgroup label="部门经理">
+                        <option value="部门经理">部门经理</option>
+                      </optgroup>
+                      <optgroup label="销售人员">
+                        <option value="销售顾问">销售顾问</option>
+                        <option value="销售专员">销售专员</option>
+                        <option value="业务员">业务员</option>
+                      </optgroup>
+                      <optgroup label="专家/讲师">
+                        <option value="专家">专家</option>
+                        <option value="培训师">培训师</option>
+                        <option value="讲师">讲师</option>
+                      </optgroup>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      💡 提示：更改为"部门经理"将自动授予部门经理权限
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">手机号码 *</label>
@@ -1483,7 +1529,7 @@ export default function SalesPersonManagement() {
                           work_status: newSalespersonForm.work_status,
                           avatar: null,
                           username: newSalespersonForm.email, // 使用邮箱作为用户名
-                          role: 'salesperson',
+                          role: newSalespersonForm.role || 'salesperson',
                           updated_at: new Date().toISOString()
                         });
                         
@@ -1500,7 +1546,8 @@ export default function SalesPersonManagement() {
                           team: '',
                           join_date: '',
                           status: 'enabled',
-                          work_status: 'active'
+                          work_status: 'active',
+                          role: 'salesperson'
                         });
                         
                         // 重新加载数据
@@ -1560,14 +1607,31 @@ export default function SalesPersonManagement() {
                      />
                    </div>
                    <div>
-                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">职位</label>
-                     <input
-                       type="text"
-                       name="position"
-                       defaultValue={selectedSalesperson.position || ''}
-                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                     />
-                   </div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">职位/角色 *</label>
+                    <select
+                      name="position"
+                      defaultValue={selectedSalesperson.position || '销售顾问'}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                    >
+                      <optgroup label="部门经理">
+                        <option value="部门经理">部门经理</option>
+                      </optgroup>
+                      <optgroup label="销售人员">
+                        <option value="销售顾问">销售顾问</option>
+                        <option value="销售专员">销售专员</option>
+                        <option value="业务员">业务员</option>
+                      </optgroup>
+                      <optgroup label="专家/讲师">
+                        <option value="专家">专家</option>
+                        <option value="培训师">培训师</option>
+                        <option value="讲师">讲师</option>
+                      </optgroup>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      💡 提示：更改为"部门经理"将自动授予部门经理权限
+                    </p>
+                  </div>
                    <div>
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">手机号码 *</label>
                      <input
@@ -1697,78 +1761,6 @@ export default function SalesPersonManagement() {
            </motion.div>
          </motion.div>
        )}
-
-       {/* 权限设置模态框 */}
-      {isPermissionModalOpen && selectedSalesperson && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={() => setIsPermissionModalOpen(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">设置 {selectedSalesperson.name} 的权限</h2>
-                <button
-                  onClick={() => setIsPermissionModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <i className="fas fa-times text-xl"></i>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {permissions.map(permission => (
-                    <label key={permission.id} className="flex items-start p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={selectedPermissions.includes(permission.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedPermissions(prev => [...prev, permission.id]);
-                          } else {
-                            setSelectedPermissions(prev => prev.filter(p => p !== permission.id));
-                          }
-                        }}
-                        className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-800 dark:text-white">{permission.name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{permission.description}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsPermissionModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors mr-2"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={savePermissions}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                >
-                  保存设置
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
 
       {/* 客户详情模态框 */}
       {isCustomerDetailModalOpen && selectedCustomer && (

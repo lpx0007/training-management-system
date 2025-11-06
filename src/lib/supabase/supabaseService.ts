@@ -838,14 +838,21 @@ class SupabaseService {
         return await supabase
           .from('user_profiles')
           .select('*')
-          .eq('role', 'salesperson')
+          .in('role', ['salesperson', 'manager']) // 包含业务员和部门经理
           .order('created_at', { ascending: false });
       });
 
       if (error) throw error;
-      console.log('🔧 getSalespersons 返回的数据:', data);
-      console.log('🔧 业务员数量:', data?.length || 0);
-      return data || [];
+      
+      // 为没有position的用户根据role设置默认职位
+      const dataWithPosition = (data || []).map(user => ({
+        ...user,
+        position: user.position || (user.role === 'manager' ? '部门经理' : '销售')
+      }));
+      
+      console.log('🔧 getSalespersons 返回的数据:', dataWithPosition);
+      console.log('🔧 业务员数量:', dataWithPosition?.length || 0);
+      return dataWithPosition || [];
     } catch (error) {
       const supabaseError = handleSupabaseError(error);
       logError(supabaseError, 'getSalespersons');
@@ -1247,7 +1254,7 @@ class SupabaseService {
    * 批量更新角色权限（针对指定角色的所有用户）
    */
   async batchUpdateRolePermissions(
-    role: 'admin' | 'salesperson' | 'expert',
+    role: 'admin' | 'salesperson' | 'expert' | 'manager',
     permissionIds: string[],
     strategy: 'override' | 'merge' | 'reset'
   ): Promise<{ success: number; failed: number; errors: string[] }> {
@@ -1441,7 +1448,7 @@ class SupabaseService {
    * 批量更新角色功能面板访问权限（针对指定角色的所有用户）
    */
   async batchUpdateRoleMenuAccess(
-    role: 'admin' | 'salesperson' | 'expert',
+    role: 'admin' | 'salesperson' | 'expert' | 'manager',
     featureIds: string[],
     strategy: 'override' | 'merge' | 'reset'
   ): Promise<{ success: number; failed: number; errors: string[] }> {

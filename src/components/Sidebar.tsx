@@ -126,7 +126,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath }: SidebarProps) => 
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-800 dark:text-white">{user?.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : '专家'}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : user?.role === 'manager' ? '部门经理' : '专家'}</p>
             </div>
             <button
               onClick={handleLogout}

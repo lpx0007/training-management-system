@@ -211,10 +211,26 @@ class DataManagementService {
     return results;
   }
 
-  // 导出数据
-  async exportData(config: ExportConfig): Promise<any[]> {
+  // 导出数据（带权限和数据范围控制）
+  async exportData(
+    config: ExportConfig, 
+    userId?: string, 
+    userRole?: string,
+    permissions?: string[]
+  ): Promise<any[]> {
     const tableName = this.getTableName(config.dataType);
     let query = supabase.from(tableName).select('*');
+
+    // 数据范围过滤：业务员只能导出自己的数据
+    if (config.dataType === 'customers' && userRole === 'salesperson') {
+      // 检查是否有查看所有客户的权限
+      const canViewAll = permissions?.includes('customer_view_all');
+      
+      if (!canViewAll && userId) {
+        // 只能导出自己负责的客户
+        query = query.eq('salesperson_id', userId);
+      }
+    }
 
     // 应用筛选条件
     if (config.filters) {

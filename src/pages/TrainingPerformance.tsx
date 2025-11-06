@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from 'react';
   import { AuthContext } from '@/contexts/authContext';
   import { useLocation } from 'react-router-dom';
-  import { Calendar, Filter, Search, ChevronDown, Users, Clock, UserCheck, MapPin, GraduationCap, Plus, ExternalLink } from 'lucide-react';
+  import { Calendar, Filter, Search, ChevronDown, Users, Clock, MapPin, GraduationCap, Plus, ExternalLink, Phone, Mail, Briefcase, UserPlus, UserCircle } from 'lucide-react';
   import { Empty } from '@/components/Empty';
   import Sidebar from '@/components/Sidebar';
   import { PermissionGuard } from '@/components/PermissionGuard';
@@ -41,6 +41,11 @@ export default function TrainingPerformance() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [selectedExpertDetail, setSelectedExpertDetail] = useState<Expert | null>(null);
   const [isExpertModalOpen, setIsExpertModalOpen] = useState(false);
+  const [isPriceConfirmModalOpen, setIsPriceConfirmModalOpen] = useState(false);
+  const [selectedCustomerForAdd, setSelectedCustomerForAdd] = useState<Customer | null>(null);
+  const [participationMode, setParticipationMode] = useState<'online' | 'offline'>('offline');
+  const [isCustomerDetailModalOpen, setIsCustomerDetailModalOpen] = useState(false);
+  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<Customer | null>(null);
 
   // 初始化数据
   useEffect(() => {
@@ -345,7 +350,7 @@ export default function TrainingPerformance() {
     }
   };
 
-  // 确认添加客户 - 添加去重逻辑
+  // 选择客户后打开价格确认模态框
   const confirmAddCustomer = async (customer: Customer) => {
     try {
       if (!selectedTrainingId) return;
@@ -365,23 +370,46 @@ export default function TrainingPerformance() {
         }
       }
       
+      // 设置选中的客户并打开价格确认模态框
+      setSelectedCustomerForAdd(customer);
+      setParticipationMode('offline'); // 默认线下
+      setIsPriceConfirmModalOpen(true);
+      setIsCustomerSelectModalOpen(false);
+    } catch (error) {
+      toast.error('操作失败，请重试');
+    }
+  };
+
+  // 确认添加客户（价格确认后）
+  const finalAddCustomer = async () => {
+    try {
+      if (!selectedTrainingId || !selectedCustomerForAdd || !selectedSession) return;
+      
+      // 根据参与方式计算价格
+      const price = participationMode === 'online' 
+        ? ((selectedSession as any).online_price || 0)
+        : ((selectedSession as any).offline_price || 0);
+      
       const success = await supabaseService.addCustomerToTraining(selectedTrainingId, {
-        name: customer.name,
-        phone: customer.phone,
-        email: customer.email,
+        name: selectedCustomerForAdd.name,
+        phone: selectedCustomerForAdd.phone,
+        email: selectedCustomerForAdd.email,
         registration_date: new Date().toISOString().split('T')[0],
         payment_status: '已支付',
         salesperson_name: user?.name || '',
-        customer_id: customer.id
+        customer_id: selectedCustomerForAdd.id,
+        participation_mode: participationMode,
+        payment_amount: price
       });
       
       if (success) {
-        toast.success(`已成功添加客户 ${customer.name} 到培训`);
+        toast.success(`已成功添加客户 ${selectedCustomerForAdd.name} 到培训`);
         // 刷新数据（业务员只加载自己的客户）
         const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
         const sessions = await supabaseService.getTrainingSessions(salespersonName);
         setAllSessions(sessions);
-        setIsCustomerSelectModalOpen(false);
+        setIsPriceConfirmModalOpen(false);
+        setSelectedCustomerForAdd(null);
         
         // 如果详情模态框是打开的，也刷新详情
         if (selectedSession) {
@@ -498,6 +526,9 @@ export default function TrainingPerformance() {
       const salespersonId = formData.get('salespersonId') as string;
       const capacity = parseInt(formData.get('capacity') as string) || 30;
       const prospectusId = formData.get('prospectusId') as string;
+      const trainingMode = formData.get('trainingMode') as string;
+      const onlinePrice = parseFloat(formData.get('onlinePrice') as string) || 0;
+      const offlinePrice = parseFloat(formData.get('offlinePrice') as string) || 0;
       
       // 调试日志：查看所有表单数据
       console.log('📝 编辑表单提交数据:', {
@@ -601,7 +632,10 @@ export default function TrainingPerformance() {
         course_id: null,
         course_description: courseDescription || null,
         salesperson_id: salespersonId || null,
-        prospectus_id: prospectusId ? parseInt(prospectusId) : null
+        prospectus_id: prospectusId ? parseInt(prospectusId) : null,
+        training_mode: trainingMode,
+        online_price: onlinePrice,
+        offline_price: offlinePrice
       };
       
       console.log('💾 准备更新到数据库的数据:', updateData);
@@ -657,6 +691,9 @@ export default function TrainingPerformance() {
       const detailedAddress = formData.get('detailedAddress') as string;
       const capacity = parseInt(formData.get('capacity') as string) || 30;
       const prospectusId = formData.get('prospectusId') as string;
+      const trainingMode = formData.get('trainingMode') as string;
+      const onlinePrice = parseFloat(formData.get('onlinePrice') as string) || 0;
+      const offlinePrice = parseFloat(formData.get('offlinePrice') as string) || 0;
       
       // 验证必填字段
       if (!name || !startDate || !endDate || !expertId) {
@@ -763,7 +800,10 @@ export default function TrainingPerformance() {
         salesperson_name: user?.name || null,
         course_id: null,
         course_description: null,
-        prospectus_id: prospectusId ? parseInt(prospectusId) : null
+        prospectus_id: prospectusId ? parseInt(prospectusId) : null,
+        training_mode: trainingMode,
+        online_price: onlinePrice,
+        offline_price: offlinePrice
       });
       
       toast.success('培训添加成功');
@@ -1066,14 +1106,10 @@ export default function TrainingPerformance() {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-                        onClick={() => handleSort('expert')}
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
-                          授课专家
-                          {sortConfig?.key === 'expert' && (
-                            <i className={`fas ml-1 ${sortConfig.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`}></i>
-                          )}
+                          收费标准
                         </div>
                       </th>
                       <th
@@ -1149,16 +1185,28 @@ export default function TrainingPerformance() {
                             }
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                          <div className="flex items-center">
-                            <UserCheck size={14} className="mr-2 text-gray-400" />
-                            <button 
-                              onClick={() => session.expertId && openExpertDetail(session.expertId)}
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 cursor-pointer"
-                              disabled={!session.expertId}
-                            >
-                              {session.expert}
-                            </button>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex flex-col space-y-1">
+                            {/* 培训模式 */}
+                            <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full w-fit ${
+                              (session as any).training_mode === 'online'
+                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                                : (session as any).training_mode === 'offline'
+                                ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                : 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300'
+                            }`}>
+                              {(session as any).training_mode === 'online' ? '纯线上' : (session as any).training_mode === 'offline' ? '纯线下' : '线上+线下'}
+                            </span>
+                            {/* 价格信息 */}
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                线上: ¥{((session as any).online_price || 0).toFixed(0)}
+                              </span>
+                              <span className="text-gray-400">|</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                线下: ¥{((session as any).offline_price || 0).toFixed(0)}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
@@ -1411,6 +1459,48 @@ export default function TrainingPerformance() {
                      />
                    </div>
 
+                   {/* 培训模式 */}
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">培训模式</label>
+                     <select
+                       name="trainingMode"
+                       defaultValue="offline"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     >
+                       <option value="online">纯线上</option>
+                       <option value="offline">纯线下</option>
+                       <option value="mixed">线上+线下</option>
+                     </select>
+                   </div>
+
+                   {/* 线上价格 */}
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">线上价格 (¥)</label>
+                     <input
+                       type="number"
+                       name="onlinePrice"
+                       defaultValue={0}
+                       min={0}
+                       step="0.01"
+                       placeholder="例如：1980.00"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     />
+                   </div>
+
+                   {/* 线下价格 */}
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">线下价格 (¥)</label>
+                     <input
+                       type="number"
+                       name="offlinePrice"
+                       defaultValue={0}
+                       min={0}
+                       step="0.01"
+                       placeholder="例如：2980.00"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     />
+                   </div>
+
                    {/* 业务区域 - 可选，文本输入 */}
                    <div>
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">业务区域</label>
@@ -1607,13 +1697,38 @@ export default function TrainingPerformance() {
                      />
                    </div>
                    <div>
-                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">容纳人数</label>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">培训模式</label>
+                     <select
+                       name="trainingMode"
+                       defaultValue={(editSession as any).trainingMode || 'offline'}
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     >
+                       <option value="online">纯线上</option>
+                       <option value="offline">纯线下</option>
+                       <option value="mixed">线上+线下</option>
+                     </select>
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">线上价格 (¥)</label>
                      <input
                        type="number"
-                       name="capacity"
-                       defaultValue={editSession.capacity || 30}
-                       min={1}
-                       placeholder="输入容纳人数"
+                       name="onlinePrice"
+                       defaultValue={(editSession as any).onlinePrice || 0}
+                       min={0}
+                       step="0.01"
+                       placeholder="例如：1980.00"
+                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">线下价格 (¥)</label>
+                     <input
+                       type="number"
+                       name="offlinePrice"
+                       defaultValue={(editSession as any).offlinePrice || 0}
+                       min={0}
+                       step="0.01"
+                       placeholder="例如：2980.00"
                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                      />
                    </div>
@@ -1854,8 +1969,28 @@ export default function TrainingPerformance() {
                           <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.salespersonName || '未分配'}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">对应课程</span>
-                          <span className="text-sm font-medium text-gray-800 dark:text-white">{getCourseName(selectedSession.courseId || undefined)}</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">培训模式</span>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            (selectedSession as any).training_mode === 'online'
+                              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                              : (selectedSession as any).training_mode === 'offline'
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                              : 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300'
+                          }`}>
+                            {(selectedSession as any).training_mode === 'online' ? '纯线上' : (selectedSession as any).training_mode === 'offline' ? '纯线下' : '线上+线下'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">线上价格</span>
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            ¥ {((selectedSession as any).online_price || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">线下价格</span>
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                            ¥ {((selectedSession as any).offline_price || 0).toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1964,63 +2099,156 @@ export default function TrainingPerformance() {
                 {/* 专家角色不显示参训人员详细信息 */}
                 {user?.role !== 'expert' && selectedSession.participantsList && selectedSession.participantsList.length > 0 && (
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                    {/* 业绩统计区域 - 放在最上方 */}
+                    <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {(() => {
+                        const participants = selectedSession.participantsList || [];
+                        const myParticipants = user?.role === 'salesperson' 
+                          ? participants 
+                          : participants;
+                        
+                        const totalRevenue = myParticipants.reduce((sum, p) => sum + ((p as any).paymentAmount || 0), 0);
+                        const onlineCount = myParticipants.filter(p => (p as any).participationMode === 'online').length;
+                        const offlineCount = myParticipants.filter(p => (p as any).participationMode === 'offline').length;
+                        const onlineRevenue = myParticipants
+                          .filter(p => (p as any).participationMode === 'online')
+                          .reduce((sum, p) => sum + ((p as any).paymentAmount || 0), 0);
+                        const offlineRevenue = myParticipants
+                          .filter(p => (p as any).participationMode === 'offline')
+                          .reduce((sum, p) => sum + ((p as any).paymentAmount || 0), 0);
+                        
+                        return (
+                          <>
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                              <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">总业绩</p>
+                              <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">¥{totalRevenue.toFixed(2)}</p>
+                            </div>
+                            
+                            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 p-4 rounded-lg border border-green-200 dark:border-green-700">
+                              <p className="text-sm text-green-600 dark:text-green-400 mb-1">线上收入</p>
+                              <p className="text-xl font-bold text-green-700 dark:text-green-300">¥{onlineRevenue.toFixed(2)}</p>
+                              <p className="text-xs text-green-600 dark:text-green-400 mt-1">{onlineCount} 人</p>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
+                              <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">线下收入</p>
+                              <p className="text-xl font-bold text-purple-700 dark:text-purple-300">¥{offlineRevenue.toFixed(2)}</p>
+                              <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">{offlineCount} 人</p>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/30 dark:to-gray-600/30 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">人均贡献</p>
+                              <p className="text-xl font-bold text-gray-700 dark:text-gray-300">
+                                ¥{myParticipants.length > 0 ? (totalRevenue / myParticipants.length).toFixed(2) : '0.00'}
+                              </p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{myParticipants.length} 人</p>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* 参训人员明细表格 */}
                     <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
-                      参训人员 ({selectedSession.participantsList.length})
+                      参训人员明细 ({selectedSession.participantsList.length})
                       {user?.role === 'salesperson' && (
                         <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">（仅显示您的客户）</span>
                       )}
                     </h4>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700/50">
-                          <tr>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">姓名</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">电话</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">邮箱</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">报名日期</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">支付状态</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">操作</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                          {selectedSession.participantsList.map((participant) => {
-                            // 业务员只能删除自己的客户，管理员可以删除所有客户
-                            const canDelete = user?.role === 'admin' || participant.salespersonName === user?.name;
-                            
-                            return (
-                              <tr key={participant.id}>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-white">{participant.name}</td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.phone}</td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.email}</td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.registrationDate}</td>
-                                <td className="px-4 py-2 whitespace-nowrap">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    participant.paymentStatus === '已支付'
-                                      ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
-                                      : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
-                                  }`}>
-                                    {participant.paymentStatus}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                  {canDelete ? (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-700/50">
+                            <tr>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">姓名</th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">电话</th>
+                              {user?.role === 'admin' && (
+                                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">业务员</th>
+                              )}
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">方式</th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">报名日期</th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">支付状态</th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">付款金额</th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {selectedSession.participantsList.map((participant) => {
+                              // 业务员只能删除自己的客户，管理员可以删除所有客户
+                              const canDelete = user?.role === 'admin' || participant.salespersonName === user?.name;
+                              
+                              return (
+                                <tr key={participant.id}>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm">
                                     <button
-                                      onClick={() => handleRemoveParticipant(participant.id, participant.name)}
-                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors"
-                                      title="移除参训者"
+                                      onClick={async () => {
+                                        // 获取完整的客户信息并打开详情模态框
+                                        try {
+                                          const customerId = (participant as any).customerId;
+                                          if (customerId) {
+                                            // 从数据库获取完整客户信息
+                                            const customerData = await supabaseService.getCustomerById(customerId);
+                                            if (customerData) {
+                                              setSelectedCustomerDetail(customerData);
+                                              setIsCustomerDetailModalOpen(true);
+                                            } else {
+                                              toast.error('无法获取客户信息');
+                                            }
+                                          }
+                                        } catch (error) {
+                                          console.error('获取客户信息失败:', error);
+                                          toast.error('获取客户信息失败');
+                                        }
+                                      }}
+                                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium cursor-pointer hover:underline"
                                     >
-                                      删除
+                                      {participant.name}
                                     </button>
-                                  ) : (
-                                    <span className="text-gray-400 dark:text-gray-600 text-xs">无权限</span>
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.phone}</td>
+                                  {user?.role === 'admin' && (
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.salespersonName || '未分配'}</td>
                                   )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                  <td className="px-4 py-2 whitespace-nowrap">
+                                    <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full ${
+                                      (participant as any).participationMode === 'online'
+                                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                                        : 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                    }`}>
+                                      {(participant as any).participationMode === 'online' ? '线上' : '线下'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.registrationDate}</td>
+                                  <td className="px-4 py-2 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      participant.paymentStatus === '已支付'
+                                        ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                        : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
+                                    }`}>
+                                      {participant.paymentStatus}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400">
+                                    ¥{((participant as any).paymentAmount || 0).toFixed(2)}
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                    {canDelete ? (
+                                      <button
+                                        onClick={() => handleRemoveParticipant(participant.id, participant.name)}
+                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors"
+                                        title="移除参训者"
+                                      >
+                                        删除
+                                      </button>
+                                    ) : (
+                                      <span className="text-gray-400 dark:text-gray-600 text-xs">无权限</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                   </div>
                 )}
               </div>
@@ -2032,14 +2260,16 @@ export default function TrainingPerformance() {
                 >
                   关闭
                 </button>
-                {user?.role !== 'admin' && selectedSession.status === 'upcoming' && (
-                  <button 
-                    className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
-                    onClick={() => handleAddCustomer(selectedSession.id)}
-                  >
-                    添加客户
-                  </button>
-                )}
+                <PermissionGuard permission="training_add_participant">
+                  {selectedSession.status === 'upcoming' && (
+                    <button 
+                      className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+                      onClick={() => handleAddCustomer(selectedSession.id)}
+                    >
+                      添加客户
+                    </button>
+                  )}
+                </PermissionGuard>
               </div>
             </div>
           </div>
@@ -2107,15 +2337,22 @@ export default function TrainingPerformance() {
                         </div>
                       </div>
                       <div className="flex items-center">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-3 ${
-                          customer.status === '已成交'
-                            ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
-                            : customer.status === '跟进中'
-                            ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
-                            : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
-                        }`}>
-                          {customer.status}
-                        </span>
+                        {(() => {
+                          // 检查客户是否已经在该培训的参训人员列表中
+                          const isInTraining = selectedSession?.participantsList?.some(
+                            participant => participant.customerId === customer.id || participant.name === customer.name
+                          );
+                          return (
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-3 ${
+                              isInTraining
+                                ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {isInTraining ? '已成交' : '未成交'}
+                            </span>
+                          );
+                        })()}
+                        
                         <button 
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                           onClick={(e) => {
@@ -2141,6 +2378,104 @@ export default function TrainingPerformance() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 价格确认模态框 */}
+      {isPriceConfirmModalOpen && selectedCustomerForAdd && selectedSession && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsPriceConfirmModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">确认添加参训客户</h2>
+                <button
+                  onClick={() => setIsPriceConfirmModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    客户信息
+                  </label>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                    <p className="text-gray-800 dark:text-white font-medium">{selectedCustomerForAdd.name}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{selectedCustomerForAdd.phone}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    参与方式
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setParticipationMode('online')}
+                      className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                        participationMode === 'online'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      线上
+                    </button>
+                    <button
+                      onClick={() => setParticipationMode('offline')}
+                      className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                        participationMode === 'offline'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      线下
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    培训价格
+                  </label>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {participationMode === 'online' ? '线上价格' : '线下价格'}
+                      </span>
+                      <span className="text-2xl font-bold text-gray-800 dark:text-white">
+                        ¥{participationMode === 'online' 
+                          ? ((selectedSession as any).online_price || 0).toLocaleString()
+                          : ((selectedSession as any).offline_price || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setIsPriceConfirmModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={finalAddCustomer}
+                  className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+                >
+                  确认添加
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2257,6 +2592,153 @@ export default function TrainingPerformance() {
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={closeModal}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 客户详情模态框 */}
+      {isCustomerDetailModalOpen && selectedCustomerDetail && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsCustomerDetailModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">客户详情</h2>
+                <button
+                  onClick={() => setIsCustomerDetailModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-6 mb-6">
+                <div className="flex-shrink-0">
+                  <img
+                    src={selectedCustomerDetail.avatar || generateDefaultAvatar(selectedCustomerDetail.name, 256)}
+                    alt={selectedCustomerDetail.name}
+                    className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-md"
+                  />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{selectedCustomerDetail.name}</h3>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {(selectedCustomerDetail.tags || []).map((tag, index) => (
+                      <span key={index} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-sm rounded-full">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="flex items-center">
+                      <Phone size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">{selectedCustomerDetail.phone}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Mail size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">{selectedCustomerDetail.email}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Briefcase size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">{selectedCustomerDetail.company}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">{selectedCustomerDetail.location}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${selectedCustomerDetail.follow_up_status === '已完成'
+                        ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                        : selectedCustomerDetail.follow_up_status === '待跟进'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
+                          : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                        }`}>
+                        {selectedCustomerDetail.follow_up_status}
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <UserPlus size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">负责业务员: {selectedCustomerDetail.salesperson_name || '未分配'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">培训历史</h4>
+                {((selectedCustomerDetail as any).training_history || []).length > 0 ? (
+                  <div className="space-y-3">
+                    {((selectedCustomerDetail as any).training_history || []).map((training: any) => (
+                      <div key={training.id} className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                          <Calendar size={20} />
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <p className="text-sm font-medium text-gray-800 dark:text-white">{training.name}</p>
+                          <div className="flex items-center mt-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 mr-4">
+                              {training.date}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${training.status === '已完成'
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                              : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
+                              }`}>
+                              {training.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">暂无培训记录</p>
+                )}
+              </div>
+
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">跟进记录</h4>
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                        <UserCircle size={16} />
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-800 dark:text-white">
+                            {selectedCustomerDetail.salesperson_name || '业务员'}的跟进记录 #{i}
+                          </p>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            2025-10-{i + 15}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          与客户沟通了培训需求，客户对培训课程表现出浓厚兴趣，计划在近期安排进一步的详细咨询。
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setIsCustomerDetailModalOpen(false)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                 >
                   关闭

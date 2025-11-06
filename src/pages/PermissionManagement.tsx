@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 interface UserWithPermissions {
   id: string;
   username: string;
-  role: 'admin' | 'salesperson' | 'expert';
+  role: 'admin' | 'salesperson' | 'expert' | 'manager';
   name: string;
   department: string | null;
   status: string;
@@ -33,7 +33,7 @@ export default function PermissionManagement() {
   // 状态管理
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'all' | 'admin' | 'salesperson' | 'expert'>('all');
+  const [selectedRole, setSelectedRole] = useState<'all' | 'admin' | 'salesperson' | 'expert' | 'manager'>('all');
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserWithPermissions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +46,7 @@ export default function PermissionManagement() {
   
   // 角色批量设置状态
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-  const [selectedRoleForBatch, setSelectedRoleForBatch] = useState<'admin' | 'salesperson' | 'expert' | null>(null);
+  const [selectedRoleForBatch, setSelectedRoleForBatch] = useState<'admin' | 'salesperson' | 'expert' | 'manager' | null>(null);
   const [batchStrategy, setBatchStrategy] = useState<'override' | 'merge' | 'reset'>('merge');
 
   // 权限分类和功能面板
@@ -125,7 +125,7 @@ export default function PermissionManagement() {
   };
 
   // 打开角色批量设置模态框
-  const openRoleModal = (role: 'admin' | 'salesperson' | 'expert') => {
+  const openRoleModal = (role: 'admin' | 'salesperson' | 'expert' | 'manager') => {
     setSelectedRoleForBatch(role);
     
     // 加载该角色的默认权限和功能面板
@@ -256,7 +256,8 @@ export default function PermissionManagement() {
     const roleMap: Record<string, string> = {
       admin: '管理员',
       salesperson: '业务员',
-      expert: '专家'
+      expert: '专家',
+      manager: '部门经理'
     };
     return roleMap[role] || role;
   };
@@ -356,7 +357,7 @@ export default function PermissionManagement() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               快速为某个角色的所有用户统一设置权限和功能面板访问权限
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* 管理员角色 */}
               <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
@@ -430,6 +431,32 @@ export default function PermissionManagement() {
                 <button
                   onClick={() => openRoleModal('expert')}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                >
+                  批量设置
+                </button>
+              </div>
+
+              {/* 部门经理角色 */}
+              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-3">
+                      <i className="fas fa-user-tie text-purple-600 dark:text-purple-400"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-800 dark:text-white">部门经理</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {users.filter(u => u.role === 'manager').length} 个用户
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  管理部门团队、业务员和部门业绩
+                </p>
+                <button
+                  onClick={() => openRoleModal('manager')}
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
                 >
                   批量设置
                 </button>

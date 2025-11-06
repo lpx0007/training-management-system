@@ -1,6 +1,6 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '@/contexts/authContext';
-import { Database, Download, Upload, FileText, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Database, Download, Upload, FileText, CheckCircle, AlertTriangle, XCircle, Lock } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import FileUpload from '@/components/DataManagement/FileUpload';
 import { toast } from 'sonner';
@@ -11,12 +11,39 @@ import { validateData, checkDuplicates } from '@/lib/validators/dataValidator';
 import { downloadTemplate } from '@/lib/generators/templateGenerator';
 import { exportData } from '@/lib/exporters/fileExporter';
 import dataManagementService from '@/lib/services/dataManagementService';
+import { useDataManagementPermissions } from '@/hooks/useDataManagementPermissions';
 
 export default function DataManagement() {
-  const { user } = useContext(AuthContext);
+  const { user, permissions } = useContext(AuthContext);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
-  const [selectedDataType, setSelectedDataType] = useState<DataType>('courses');
+  const [selectedDataType, setSelectedDataType] = useState<DataType | null>(null);
+  
+  // 获取权限信息
+  const {
+    canImport,
+    canExport,
+    canDownloadTemplate,
+    availableDataTypes,
+    hasAnyPermission
+  } = useDataManagementPermissions();
+  
+  // 调试：输出权限信息
+  useEffect(() => {
+    console.log('=== DataManagement 权限调试 ===');
+    console.log('用户:', user?.name, user?.role);
+    console.log('权限数组:', permissions);
+    console.log('权限数量:', permissions.length);
+    console.log('可用数据类型:', availableDataTypes);
+    console.log('hasAnyPermission:', hasAnyPermission);
+  }, [user, permissions, availableDataTypes, hasAnyPermission]);
+  
+  // 初始化选中的数据类型
+  useEffect(() => {
+    if (availableDataTypes.length > 0 && !selectedDataType) {
+      setSelectedDataType(availableDataTypes[0]);
+    }
+  }, [availableDataTypes]);
   
   // 导入状态
   const [importState, setImportState] = useState<ImportState>({
@@ -42,6 +69,16 @@ export default function DataManagement() {
 
   // 处理文件上传
   const handleFileSelect = async (file: File) => {
+    if (!selectedDataType) {
+      toast.error('请先选择数据类型');
+      return;
+    }
+    
+    if (!canImport(selectedDataType)) {
+      toast.error('您没有导入该数据类型的权限');
+      return;
+    }
+    
     setImportState(prev => ({
       ...prev,
       uploadedFile: file,
@@ -82,6 +119,16 @@ export default function DataManagement() {
 
   // 执行导入
   const handleImport = async () => {
+    if (!selectedDataType) {
+      toast.error('请先选择数据类型');
+      return;
+    }
+    
+    if (!canImport(selectedDataType)) {
+      toast.error('您没有导入该数据类型的权限');
+      return;
+    }
+    
     if (importState.previewData.length === 0) {
       toast.error('没有可导入的数据');
       return;
@@ -139,12 +186,30 @@ export default function DataManagement() {
 
   // 下载模板
   const handleDownloadTemplate = () => {
+    if (!selectedDataType) {
+      toast.error('请先选择数据类型');
+      return;
+    }
+    if (!canDownloadTemplate()) {
+      toast.error('您没有下载模板的权限');
+      return;
+    }
     downloadTemplate(selectedDataType);
     toast.success('模板下载成功');
   };
 
   // 执行导出
   const handleExport = async () => {
+    if (!selectedDataType) {
+      toast.error('请先选择数据类型');
+      return;
+    }
+    
+    if (!canExport(selectedDataType)) {
+      toast.error('您没有导出该数据类型的权限');
+      return;
+    }
+    
     try {
       const selectedFields = exportState.selectedFields.length > 0 
         ? exportState.selectedFields 
@@ -159,7 +224,13 @@ export default function DataManagement() {
         filters: exportState.filters
       };
       
-      const data = await dataManagementService.exportData(exportConfig);
+      // 传递用户信息以实现数据范围过滤
+      const data = await dataManagementService.exportData(
+        exportConfig,
+        user?.id,
+        user?.role,
+        permissions
+      );
       
       await exportData(data, exportConfig);
       
@@ -184,7 +255,29 @@ export default function DataManagement() {
     }
   };
 
-  const dataTypes: DataType[] = ['courses', 'experts', 'customers', 'salespersons', 'training_sessions'];
+  // 如果用户没有任何权限，显示提示
+  if (!hasAnyPermission) {
+    return (
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+        <Sidebar 
+          sidebarOpen={sidebarOpen} 
+          setSidebarOpen={setSidebarOpen} 
+          currentPath="/data-management"
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Lock className="mx-auto text-gray-400 mb-4" size={64} />
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
+              没有访问权限
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              您没有数据管理的相关权限，请联系管理员授权
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -255,34 +348,79 @@ export default function DataManagement() {
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               数据类型
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                （根据您的权限显示可用的数据类型）
+              </span>
             </label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {dataTypes.map(type => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedDataType(type)}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    selectedDataType === type
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
-                  }`}
-                >
-                  <div className="text-center">
-                    <p className="font-medium text-gray-800 dark:text-white">
-                      {DATA_TYPE_CONFIG[type].label}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {DATA_TYPE_CONFIG[type].description}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {availableDataTypes.map(type => {
+                const hasImportPermission = canImport(type);
+                const hasExportPermission = canExport(type);
+                
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedDataType(type)}
+                    className={`p-4 rounded-lg border-2 transition-all relative ${
+                      selectedDataType === type
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <p className="font-medium text-gray-800 dark:text-white">
+                        {DATA_TYPE_CONFIG[type].label}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {DATA_TYPE_CONFIG[type].description}
+                      </p>
+                      {/* 权限标识 */}
+                      <div className="flex items-center justify-center gap-1 mt-2">
+                        {hasImportPermission && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded">
+                            导入
+                          </span>
+                        )}
+                        {hasExportPermission && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                            导出
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+            
+            {availableDataTypes.length === 0 && (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Lock className="mx-auto mb-2" size={32} />
+                <p>您没有任何数据类型的导入导出权限</p>
+              </div>
+            )}
           </div>
 
           {/* 导入标签页内容 */}
           {activeTab === 'import' && (
             <div className="space-y-6">
+              {/* 权限提示 */}
+              {selectedDataType && !canImport(selectedDataType) && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+                  <div className="flex items-center">
+                    <Lock className="text-yellow-600 dark:text-yellow-400 mr-3" size={20} />
+                    <div>
+                      <p className="font-medium text-yellow-800 dark:text-yellow-300">
+                        您没有导入 {selectedDataType && DATA_TYPE_CONFIG[selectedDataType].label} 的权限
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                        请联系管理员授予相应权限，或选择其他有权限的数据类型
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* 模板下载 */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between">
@@ -294,7 +432,12 @@ export default function DataManagement() {
                   </div>
                   <button
                     onClick={handleDownloadTemplate}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center transition-colors"
+                    disabled={!selectedDataType || !canDownloadTemplate()}
+                    className={`px-4 py-2 rounded-lg flex items-center transition-colors ${
+                      selectedDataType && canDownloadTemplate()
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    }`}
                   >
                     <FileText size={18} className="mr-2" />
                     下载模板
@@ -305,7 +448,14 @@ export default function DataManagement() {
               {/* 文件上传 */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-800 dark:text-white mb-4">上传文件</h3>
-                <FileUpload onFileSelect={handleFileSelect} />
+                {selectedDataType && canImport(selectedDataType) ? (
+                  <FileUpload onFileSelect={handleFileSelect} />
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <Lock className="mx-auto mb-2" size={32} />
+                    <p>请先选择有导入权限的数据类型</p>
+                  </div>
+                )}
               </div>
 
               {/* 验证结果 */}
@@ -382,7 +532,8 @@ export default function DataManagement() {
                             ...prev,
                             duplicateStrategy: e.target.value as any
                           }))}
-                          className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                          disabled={!selectedDataType || !canImport(selectedDataType)}
+                          className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <option value="skip">跳过</option>
                           <option value="overwrite">覆盖</option>
@@ -392,7 +543,12 @@ export default function DataManagement() {
                       
                       <button
                         onClick={handleImport}
-                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        disabled={!selectedDataType || !canImport(selectedDataType)}
+                        className={`px-6 py-2.5 rounded-lg transition-colors ${
+                          selectedDataType && canImport(selectedDataType)
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                        }`}
                       >
                         确认导入
                       </button>
@@ -406,6 +562,23 @@ export default function DataManagement() {
           {/* 导出标签页内容 */}
           {activeTab === 'export' && (
             <div className="space-y-6">
+              {/* 权限提示 */}
+              {selectedDataType && !canExport(selectedDataType) && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+                  <div className="flex items-center">
+                    <Lock className="text-yellow-600 dark:text-yellow-400 mr-3" size={20} />
+                    <div>
+                      <p className="font-medium text-yellow-800 dark:text-yellow-300">
+                        您没有导出 {selectedDataType && DATA_TYPE_CONFIG[selectedDataType].label} 的权限
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                        请联系管理员授予相应权限，或选择其他有权限的数据类型
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-800 dark:text-white mb-4">导出配置</h3>
                 
@@ -450,7 +623,12 @@ export default function DataManagement() {
                 <div className="flex justify-end">
                   <button
                     onClick={handleExport}
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center transition-colors"
+                    disabled={!selectedDataType || !canExport(selectedDataType)}
+                    className={`px-6 py-2.5 rounded-lg flex items-center transition-colors ${
+                      selectedDataType && canExport(selectedDataType)
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    }`}
                   >
                     <Download size={18} className="mr-2" />
                     导出数据

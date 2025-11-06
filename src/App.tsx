@@ -16,6 +16,7 @@ import NotificationCenter from "@/pages/NotificationCenter";
 import AnnouncementList from "@/pages/AnnouncementList";
 import PosterGenerator from "@/pages/PosterGenerator";
 import ProspectusManagement from "@/pages/ProspectusManagement";
+import InitDepartmentManager from "@/pages/InitDepartmentManager";
 import { useState, useEffect } from "react";
 import { AuthContext, User } from '@/contexts/authContext';
 import { toast } from 'sonner';
@@ -409,27 +410,27 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/training-performance" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
             <TrainingPerformance />
           </ProtectedRoute>
         } />
         <Route path="/training-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
             <TrainingPerformance />
           </ProtectedRoute>
         } />
         <Route path="/expert-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
             <ExpertManagement />
           </ProtectedRoute>
         } />
         <Route path="/sales-tracking" element={
-          <ProtectedRoute requiredRole={['admin']}>
+          <ProtectedRoute requiredRole={['admin', 'manager']}>
             <SalesTracking />
           </ProtectedRoute>
         } />
         <Route path="/customer-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager']}>
             <CustomerManagement />
           </ProtectedRoute>
         } />
@@ -439,12 +440,12 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/data-management" element={
-          <ProtectedRoute requiredRole={['admin']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager']}>
             <DataManagement />
           </ProtectedRoute>
         } />
         <Route path="/salesperson-management" element={
-          <ProtectedRoute requiredRole={['admin']}>
+          <ProtectedRoute requiredRole={['admin', 'manager']}>
             <SalesPersonManagement />
           </ProtectedRoute>
         } />
@@ -474,13 +475,18 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/poster-generator" element={
-          <ProtectedRoute requiredRole={['admin']}>
+          <ProtectedRoute requiredRole={['admin', 'manager']}>
             <PosterGenerator />
           </ProtectedRoute>
         } />
         <Route path="/prospectus-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
             <ProspectusManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/init-department-manager" element={
+          <ProtectedRoute requiredRole={['admin']}>
+            <InitDepartmentManager />
           </ProtectedRoute>
         } />
       </Routes>
