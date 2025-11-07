@@ -93,6 +93,7 @@ export const MENU_FEATURES: MenuFeature[] = [
       'expert_import', 'expert_export',
       'salesperson_import', 'salesperson_export',
       'prospectus_import', 'prospectus_export',
+      'performance_export',
       'data_download_template'
     ], // 拥有任一导入导出权限即可访问
     displayOrder: 8

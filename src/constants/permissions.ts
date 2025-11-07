@@ -70,6 +70,7 @@ export const PERMISSION_CATEGORIES: Record<string, PermissionCategory> = {
       { id: 'salesperson_edit', name: '编辑业务员', description: '编辑业务员信息' },
       { id: 'salesperson_delete', name: '删除业务员', description: '删除业务员记录' },
       { id: 'salesperson_view_performance', name: '查看业务员绩效', description: '查看业务员绩效数据' },
+      { id: 'performance_view_all_departments', name: '查看所有部门业绩', description: '查看跨部门的业务员业绩数据（经理默认只能看本部门）' },
     ]
   },
   PROSPECTUS: {
@@ -115,6 +116,8 @@ export const PERMISSION_CATEGORIES: Record<string, PermissionCategory> = {
       // 简章数据导入导出
       { id: 'prospectus_import', name: '导入简章信息', description: '批量导入简章元数据' },
       { id: 'prospectus_export', name: '导出简章信息', description: '导出简章元数据' },
+      // 业绩数据导出
+      { id: 'performance_export', name: '导出业绩数据', description: '导出业务员业绩和课程销售业绩数据（含明细）' },
       // 通用功能
       { id: 'data_download_template', name: '下载导入模板', description: '下载各类数据导入模板' },
       { id: 'data_view_history', name: '查看数据操作历史', description: '查看数据导入导出历史记录' },
@@ -189,7 +192,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'salesperson_edit',
     'salesperson_view_performance',
     // 数据管理
+    'performance_export', // 可以导出业绩数据
     'data_view_history',
+    // 注意：performance_view_all_departments 需要管理员手动分配
   ]
 };
 

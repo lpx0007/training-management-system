@@ -77,6 +77,7 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'salesperson_edit',
       'salesperson_delete',
       'salesperson_view_performance',
+      'performance_view_all_departments',
       'salesperson_import',
       'salesperson_export',
     ],
@@ -119,6 +120,8 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'salesperson_export',
       'prospectus_import',
       'prospectus_export',
+      // 业绩数据导出权限
+      'performance_export',
       // 通用数据管理权限
       'data_download_template',
       'data_view_history',
@@ -129,6 +132,7 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
     featureId: 'sales_tracking',
     permissions: [
       'salesperson_view_performance',
+      'performance_view_all_departments',
       // 跨功能权限：销售追踪需要查看客户数据
       'customer_view',
       'customer_view_all',

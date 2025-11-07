@@ -17,7 +17,9 @@ class DataManagementService {
       experts: 'experts',
       customers: 'customers',
       salespersons: 'salespersons',
-      training_sessions: 'training_sessions'
+      training_sessions: 'training_sessions',
+      salesperson_performance: '_virtual_',
+      course_sales_performance: '_virtual_'
     };
     return tableMap[dataType];
   }
@@ -218,6 +220,56 @@ class DataManagementService {
     userRole?: string,
     permissions?: string[]
   ): Promise<any[]> {
+    // 特殊处理：业务员业绩导出
+    if (config.dataType === 'salesperson_performance') {
+      const { getMonthlyPerformance } = await import('./performanceService');
+      
+      const timeRange = config.filters?.timeRange || '本月';
+      
+      // 获取用户部门ID（仅用于经理数据范围过滤，管理员不受限制）
+      let userDepartmentId: number | undefined;
+      if (userRole === 'manager' && userId) {
+        const { data: userProfile } = await supabase
+          .from('user_profiles')
+          .select('department_id')
+          .eq('id', userId)
+          .single();
+        userDepartmentId = (userProfile as any)?.department_id;
+      }
+      
+      // 调用业绩服务，传递用户信息（管理员不受任何数据范围限制）
+      const performanceData = await getMonthlyPerformance(
+        timeRange,
+        userRole,
+        userDepartmentId,
+        permissions
+      );
+      
+      let data = performanceData.salesPersonData || [];
+      
+      // 应用部门筛选
+      if (config.filters?.department && config.filters.department !== '全部') {
+        data = data.filter((item: any) => item.department === config.filters.department);
+      }
+      
+      // 应用业务员筛选
+      if (config.filters?.salesperson && config.filters.salesperson !== '全部') {
+        data = data.filter((item: any) => item.name === config.filters.salesperson);
+      }
+      
+      return data;
+    }
+    
+    // 特殊处理：课程销售业绩导出
+    if (config.dataType === 'course_sales_performance') {
+      const { getCoursePerformanceDetail } = await import('./performanceService');
+      const timeRange = config.filters?.timeRange || '本月';
+      const course = config.filters?.course || '全部';
+      const data = await getCoursePerformanceDetail(course, timeRange);
+      
+      return data;
+    }
+    
     const tableName = this.getTableName(config.dataType);
     let query = supabase.from(tableName).select('*');
 
@@ -330,7 +382,9 @@ class DataManagementService {
       experts: ['id', 'name', 'title', 'field', 'experience', 'rating', 'courses', 'location', 'available', 'bio', 'past_sessions', 'total_participants', 'created_at'],
       customers: ['id', 'name', 'phone', 'email', 'company', 'position', 'location', 'status', 'salesperson_name', 'follow_up_status', 'last_contact', 'tags', 'created_at'],
       salespersons: ['id', 'name', 'phone', 'email', 'department', 'position', 'join_date', 'status', 'team', 'created_at'],
-      training_sessions: ['id', 'name', 'date', 'end_date', 'start_time', 'end_time', 'participants', 'expert_name', 'area', 'revenue', 'status', 'rating', 'salesperson_name', 'course_id', 'capacity', 'created_at']
+      training_sessions: ['id', 'name', 'date', 'end_date', 'start_time', 'end_time', 'participants', 'expert_name', 'area', 'revenue', 'status', 'rating', 'salesperson_name', 'course_id', 'capacity', 'created_at'],
+      salesperson_performance: ['id', 'name', 'department', 'completedCustomers', 'revenue', 'latestDate', 'completedCustomerList'],
+      course_sales_performance: ['id', 'courseName', 'sessionDate', 'endDate', 'area', 'onlinePrice', 'offlinePrice', 'trainingMode', 'totalParticipants', 'onlineParticipants', 'offlineParticipants', 'revenue', 'status']
     };
 
     return fieldMap[dataType] || [];

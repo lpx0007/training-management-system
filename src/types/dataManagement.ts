@@ -1,6 +1,6 @@
 // 数据管理功能类型定义
 
-export type DataType = 'courses' | 'experts' | 'customers' | 'salespersons' | 'training_sessions';
+export type DataType = 'courses' | 'experts' | 'customers' | 'salespersons' | 'training_sessions' | 'salesperson_performance' | 'course_sales_performance';
 
 export type ExportFormat = 'excel' | 'csv' | 'pdf';
 

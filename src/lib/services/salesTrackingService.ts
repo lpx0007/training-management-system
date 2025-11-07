@@ -15,10 +15,9 @@ export interface SalesPersonData {
   avatar: string | null;
   department: string | null;
   revenue: number;
-  completedCustomers: number;
-  conversionRate: number;
+  completedCustomers: number; // 成交次数（不去重）
   ranking?: number;
-  completedCustomerList?: CompletedCustomer[];
+  completedCustomerList?: CompletedCustomer[]; // 成交客户列表
 }
 
 export interface MonthlySalesData {

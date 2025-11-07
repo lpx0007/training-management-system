@@ -425,7 +425,7 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/sales-tracking" element={
-          <ProtectedRoute requiredRole={['admin', 'manager']}>
+          <ProtectedRoute requiredRole={['admin', 'manager', 'salesperson']}>
             <SalesTracking />
           </ProtectedRoute>
         } />

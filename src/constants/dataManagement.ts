@@ -26,6 +26,16 @@ export const DATA_TYPE_CONFIG = {
     label: '培训场次',
     icon: 'Calendar',
     description: '批量导入或导出培训场次信息'
+  },
+  salesperson_performance: {
+    label: '业务员业绩',
+    icon: 'TrendingUp',
+    description: '导出业务员业绩统计数据（仅导出）'
+  },
+  course_sales_performance: {
+    label: '课程销售业绩',
+    icon: 'BarChart3',
+    description: '导出课程销售业绩明细（仅导出）'
   }
 } as const;
 
@@ -105,6 +115,31 @@ export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
     course_description: '课程描述',
     capacity: '容纳人数',
     created_at: '创建时间'
+  },
+  salesperson_performance: {
+    id: '业务员ID',
+    name: '业务员姓名',
+    department: '部门',
+    completedCustomers: '成交次数',
+    revenue: '销售额',
+    latestDate: '最近成交日期',
+    completedCustomerList: '成交客户列表'
+  },
+  course_sales_performance: {
+    id: '课程ID',
+    courseName: '课程名称',
+    sessionDate: '开课日期',
+    endDate: '结束日期',
+    area: '培训地点',
+    onlinePrice: '线上价格',
+    offlinePrice: '线下价格',
+    trainingMode: '培训模式',
+    totalParticipants: '参训人数',
+    onlineParticipants: '线上人数',
+    offlineParticipants: '线下人数',
+    revenue: '销售额',
+    status: '状态',
+    salespersonList: '业务员明细'
   }
 };
 
@@ -171,7 +206,9 @@ export const TEMPLATE_COLUMNS: Record<DataType, ColumnDefinition[]> = {
     { key: 'course_id', label: '关联课程ID', required: false, width: 15 },
     { key: 'course_description', label: '课程描述', required: false, width: 30 },
     { key: 'capacity', label: '容纳人数', required: false, width: 12 }
-  ]
+  ],
+  salesperson_performance: [],
+  course_sales_performance: []
 };
 
 // 示例数据
@@ -200,7 +237,9 @@ export const EXAMPLE_DATA: Record<DataType, any[]> = {
     { name: '前端开发进阶班', date: '2025-11-01', end_time: '17:00', end_date: '2025-11-01', start_time: '09:00', participants: 30, expert_name: '张教授', area: '北京', revenue: 90000, status: '计划中', rating: null, salesperson_name: '张三', course_id: 'COURSE001', course_description: 'React实战', capacity: 40 },
     { name: '项目管理实战班', date: '2025-11-05', end_time: '16:00', end_date: '2025-11-05', start_time: '10:00', participants: 25, expert_name: '李博士', area: '上海', revenue: 125000, status: '计划中', rating: null, salesperson_name: '李四', course_id: 'COURSE002', course_description: 'PMP认证', capacity: 30 },
     { name: 'UI设计原理班', date: '2025-11-10', end_time: '17:30', end_date: '2025-11-10', start_time: '09:30', participants: 20, expert_name: '王设计师', area: '广州', revenue: 50000, status: '计划中', rating: null, salesperson_name: '王五', course_id: 'COURSE003', course_description: 'Figma设计', capacity: 25 }
-  ]
+  ],
+  salesperson_performance: [],
+  course_sales_performance: []
 };
 
 // 配置常量

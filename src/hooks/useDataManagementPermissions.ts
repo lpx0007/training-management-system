@@ -7,7 +7,7 @@ import type { DataType } from '@/types/dataManagement';
  * 根据用户的细分权限判断可以导入导出哪些数据模块
  */
 export function useDataManagementPermissions() {
-  const { permissions } = useContext(AuthContext);
+  const { permissions, user } = useContext(AuthContext);
 
   // 权限映射：数据类型 -> 导入导出权限
   const permissionMap: Record<DataType, { import: string; export: string }> = {
@@ -30,6 +30,14 @@ export function useDataManagementPermissions() {
     courses: {
       import: 'prospectus_import', // 课程暂时映射到简章权限
       export: 'prospectus_export'
+    },
+    salesperson_performance: {
+      import: '', // 不支持导入
+      export: 'performance_export' // 使用业绩数据导出权限
+    },
+    course_sales_performance: {
+      import: '', // 不支持导入
+      export: 'performance_export' // 使用业绩数据导出权限
     }
   };
 
@@ -41,6 +49,11 @@ export function useDataManagementPermissions() {
 
   // 检查是否有权限导出某个数据类型
   const canExport = (dataType: DataType): boolean => {
+    // 向后兼容：管理员即使没有新权限，也能导出业绩数据（等待权限缓存刷新）
+    if ((dataType === 'salesperson_performance' || dataType === 'course_sales_performance') && user?.role === 'admin') {
+      return true;
+    }
+    
     const requiredPermission = permissionMap[dataType]?.export;
     return requiredPermission ? permissions.includes(requiredPermission) : false;
   };
@@ -57,18 +70,23 @@ export function useDataManagementPermissions() {
 
   // 获取用户可以访问的数据类型列表
   const availableDataTypes = useMemo(() => {
-    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses'];
+    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses', 'salesperson_performance', 'course_sales_performance'];
     return allDataTypes.filter(dataType => {
+      // 向后兼容：管理员可以访问业绩数据
+      if ((dataType === 'salesperson_performance' || dataType === 'course_sales_performance') && user?.role === 'admin') {
+        return true;
+      }
+      
       const importPerm = permissionMap[dataType]?.import;
       const exportPerm = permissionMap[dataType]?.export;
       return (importPerm && permissions.includes(importPerm)) || 
              (exportPerm && permissions.includes(exportPerm));
     });
-  }, [permissions]);
+  }, [permissions, user]);
 
   // 获取用户可以导入的数据类型列表
   const importableDataTypes = useMemo(() => {
-    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses'];
+    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses', 'salesperson_performance', 'course_sales_performance'];
     return allDataTypes.filter(dataType => {
       const importPerm = permissionMap[dataType]?.import;
       return importPerm && permissions.includes(importPerm);
@@ -77,12 +95,17 @@ export function useDataManagementPermissions() {
 
   // 获取用户可以导出的数据类型列表
   const exportableDataTypes = useMemo(() => {
-    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses'];
+    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses', 'salesperson_performance', 'course_sales_performance'];
     return allDataTypes.filter(dataType => {
+      // 向后兼容：管理员可以导出业绩数据
+      if ((dataType === 'salesperson_performance' || dataType === 'course_sales_performance') && user?.role === 'admin') {
+        return true;
+      }
+      
       const exportPerm = permissionMap[dataType]?.export;
       return exportPerm && permissions.includes(exportPerm);
     });
-  }, [permissions]);
+  }, [permissions, user]);
 
   // 检查用户是否有任何导入导出权限
   const hasAnyPermission = useMemo(() => {

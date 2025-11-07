@@ -12,6 +12,7 @@ import { downloadTemplate } from '@/lib/generators/templateGenerator';
 import { exportData } from '@/lib/exporters/fileExporter';
 import dataManagementService from '@/lib/services/dataManagementService';
 import { useDataManagementPermissions } from '@/hooks/useDataManagementPermissions';
+import { supabase } from '@/lib/supabase/client';
 
 export default function DataManagement() {
   const { user, permissions } = useContext(AuthContext);
@@ -66,6 +67,69 @@ export default function DataManagement() {
     filters: {},
     exportProgress: 0
   });
+  
+  // 业务员业绩筛选
+  const [performanceFilters, setPerformanceFilters] = useState({
+    timeRange: '本月',
+    department: '全部',
+    salesperson: '全部'
+  });
+  
+  // 课程销售业绩筛选
+  const [courseSalesFilters, setCourseSalesFilters] = useState({
+    course: '全部',
+    timeRange: '本月'
+  });
+  
+  // 动态加载的选项列表
+  const [departments, setDepartments] = useState<Array<{id: number, name: string}>>([]);
+  const [salespersons, setSalespersons] = useState<Array<{id: string, name: string}>>([]);
+  const [courses, setCourses] = useState<Array<{id: number, name: string}>>([]);
+  
+  // 加载部门、业务员和课程列表
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        // 加载部门列表
+        const { data: deptData } = await supabase
+          .from('departments')
+          .select('id, name')
+          .eq('status', 'active')
+          .order('name');
+        if (deptData) setDepartments(deptData);
+        
+        // 加载业务员列表
+        const { data: spData } = await supabase
+          .from('user_profiles')
+          .select('id, name')
+          .eq('role', 'salesperson')
+          .order('name');
+        if (spData) setSalespersons(spData);
+        
+        // 加载课程列表
+        const { data: courseData } = await supabase
+          .from('training_sessions')
+          .select('id, name')
+          .order('name');
+        if (courseData) {
+          // 去重课程名称
+          const uniqueCourses: Array<{id: number, name: string}> = [];
+          const seenNames = new Set<string>();
+          courseData.forEach((c: any) => {
+            if (!seenNames.has(c.name)) {
+              seenNames.add(c.name);
+              uniqueCourses.push({ id: c.id, name: c.name });
+            }
+          });
+          setCourses(uniqueCourses);
+        }
+      } catch (error) {
+        console.error('加载筛选选项失败:', error);
+      }
+    };
+    
+    loadOptions();
+  }, []);
 
   // 处理文件上传
   const handleFileSelect = async (file: File) => {
@@ -215,13 +279,21 @@ export default function DataManagement() {
         ? exportState.selectedFields 
         : dataManagementService.getExportableFields(selectedDataType);
       
+      // 构建筛选条件
+      let filters = exportState.filters;
+      if (selectedDataType === 'salesperson_performance') {
+        filters = { ...filters, ...performanceFilters };
+      } else if (selectedDataType === 'course_sales_performance') {
+        filters = { ...filters, ...courseSalesFilters };
+      }
+      
       const exportConfig = {
         dataType: selectedDataType,
         format: exportState.format,
         range: exportState.range,
         dateRange: exportState.dateRange || undefined,
         selectedFields,
-        filters: exportState.filters
+        filters
       };
       
       // 传递用户信息以实现数据范围过滤
@@ -581,6 +653,103 @@ export default function DataManagement() {
               
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-800 dark:text-white mb-4">导出配置</h3>
+                
+                {/* 业务员业绩特殊筛选 */}
+                {selectedDataType === 'salesperson_performance' && (
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">业绩筛选条件</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          时间范围
+                        </label>
+                        <select
+                          value={performanceFilters.timeRange}
+                          onChange={(e) => setPerformanceFilters(prev => ({ ...prev, timeRange: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="本月">本月</option>
+                          <option value="本季度">本季度</option>
+                          <option value="本年度">本年度</option>
+                          <option value="上月">上月</option>
+                          <option value="上季度">上季度</option>
+                          <option value="去年">去年</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          部门
+                        </label>
+                        <select
+                          value={performanceFilters.department}
+                          onChange={(e) => setPerformanceFilters(prev => ({ ...prev, department: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部部门</option>
+                          {departments.map(dept => (
+                            <option key={dept.id} value={dept.name}>{dept.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          业务员
+                        </label>
+                        <select
+                          value={performanceFilters.salesperson}
+                          onChange={(e) => setPerformanceFilters(prev => ({ ...prev, salesperson: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部业务员</option>
+                          {salespersons.map(sp => (
+                            <option key={sp.id} value={sp.name}>{sp.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 课程销售业绩特殊筛选 */}
+                {selectedDataType === 'course_sales_performance' && (
+                  <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">课程筛选条件</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          课程
+                        </label>
+                        <select
+                          value={courseSalesFilters.course}
+                          onChange={(e) => setCourseSalesFilters(prev => ({ ...prev, course: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部课程</option>
+                          {courses.map(course => (
+                            <option key={course.id} value={course.name}>{course.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          时间范围
+                        </label>
+                        <select
+                          value={courseSalesFilters.timeRange}
+                          onChange={(e) => setCourseSalesFilters(prev => ({ ...prev, timeRange: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="本月">本月</option>
+                          <option value="本季度">本季度</option>
+                          <option value="本年度">本年度</option>
+                          <option value="上月">上月</option>
+                          <option value="上季度">上季度</option>
+                          <option value="去年">去年</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div>

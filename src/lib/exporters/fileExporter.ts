@@ -8,6 +8,11 @@ import { FIELD_MAPPINGS, DATA_TYPE_CONFIG } from '@/constants/dataManagement';
 
 // 导出为 Excel
 export function exportToExcel(data: any[], config: ExportConfig): Blob {
+  // 特殊处理：业务员业绩导出（包含明细工作表）
+  if (config.dataType === 'salesperson_performance') {
+    return exportSalespersonPerformanceExcel(data, config);
+  }
+  
   // 1. 准备数据
   const mappedData = data.map(row => {
     const mappedRow: any = {};
@@ -169,6 +174,104 @@ function formatValue(value: any, field: string): string {
   }
   
   return value.toString();
+}
+
+// 导出业务员业绩（包含明细工作表）
+function exportSalespersonPerformanceExcel(data: any[], config: ExportConfig): Blob {
+  const wb = XLSX.utils.book_new();
+  
+  // 1. 创建汇总工作表
+  const summaryData = data.map(row => {
+    const mappedRow: any = {};
+    config.selectedFields.forEach(field => {
+      // 跳过 completedCustomerList 字段，它不在汇总表中显示
+      if (field === 'completedCustomerList') return;
+      const displayName = FIELD_MAPPINGS[config.dataType][field] || field;
+      mappedRow[displayName] = formatValue(row[field], field);
+    });
+    return mappedRow;
+  });
+  
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+  
+  // 设置汇总表列宽
+  const summaryColWidths = config.selectedFields
+    .filter(field => field !== 'completedCustomerList')
+    .map(field => {
+      const displayName = FIELD_MAPPINGS[config.dataType][field] || field;
+      return { wch: Math.max(displayName.length, 15) };
+    });
+  summaryWs['!cols'] = summaryColWidths;
+  
+  // 设置表头样式
+  if (summaryWs['!ref']) {
+    const range = XLSX.utils.decode_range(summaryWs['!ref']);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = XLSX.utils.encode_col(C) + '1';
+      if (!summaryWs[address]) continue;
+      if (!summaryWs[address].s) summaryWs[address].s = {};
+      summaryWs[address].s.font = { bold: true };
+    }
+  }
+  
+  XLSX.utils.book_append_sheet(wb, summaryWs, '业绩汇总');
+  
+  // 2. 为每个业务员创建明细工作表
+  data.forEach((salesperson: any) => {
+    const customerList = salesperson.completedCustomerList || [];
+    
+    if (customerList.length === 0) {
+      return; // 如果没有成交客户，跳过
+    }
+    
+    // 准备明细数据
+    const detailData = customerList.map((customer: any) => ({
+      '客户姓名': customer.name || '',
+      '联系电话': customer.phone || '',
+      '所属公司': customer.company || '',
+      '课程名称': customer.courseName || '',
+      '成交金额': customer.amount ? `¥${customer.amount.toFixed(2)}` : '¥0.00',
+      '成交日期': customer.latestDate ? new Date(customer.latestDate).toLocaleDateString('zh-CN') : ''
+    }));
+    
+    const detailWs = XLSX.utils.json_to_sheet(detailData);
+    
+    // 设置明细表列宽
+    detailWs['!cols'] = [
+      { wch: 15 }, // 客户姓名
+      { wch: 15 }, // 联系电话
+      { wch: 25 }, // 所属公司
+      { wch: 30 }, // 课程名称
+      { wch: 12 }, // 成交金额
+      { wch: 15 }  // 成交日期
+    ];
+    
+    // 设置表头样式
+    if (detailWs['!ref']) {
+      const range = XLSX.utils.decode_range(detailWs['!ref']);
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const address = XLSX.utils.encode_col(C) + '1';
+        if (!detailWs[address]) continue;
+        if (!detailWs[address].s) detailWs[address].s = {};
+        detailWs[address].s.font = { bold: true };
+      }
+    }
+    
+    // 工作表名称限制：最多31个字符，不能包含特殊字符
+    let sheetName = salesperson.name || '未知业务员';
+    sheetName = sheetName.replace(/[:\\\/\?\*\[\]]/g, ''); // 移除非法字符
+    if (sheetName.length > 31) {
+      sheetName = sheetName.substring(0, 31);
+    }
+    
+    XLSX.utils.book_append_sheet(wb, detailWs, sheetName);
+  });
+  
+  // 3. 生成文件
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([excelBuffer], { 
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  });
 }
 
 // 主导出函数
