@@ -579,7 +579,12 @@ class ProspectusService {
     try {
       let query = supabase
         .from('prospectus_downloads')
-        .select('*')
+        .select(`
+          *,
+          training_sessions:training_session_id (
+            name
+          )
+        `)
         .order('downloaded_at', { ascending: false });
 
       if (prospectusId) {
@@ -592,7 +597,14 @@ class ProspectusService {
         throw new Error(`获取下载记录失败: ${error.message}`);
       }
 
-      return data || [];
+      // 处理关联数据，将培训名称提取到顶层
+      const processedData = (data || []).map((record: any) => ({
+        ...record,
+        training_session_name: record.training_sessions?.name || null,
+        training_sessions: undefined  // 移除嵌套对象
+      }));
+
+      return processedData;
     } catch (error: any) {
       console.error('获取下载记录失败:', error);
       throw error;

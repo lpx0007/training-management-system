@@ -319,7 +319,7 @@ export default function CustomerManagement() {
           training_sessions(
             id,
             name,
-            start_time,
+            date,
             status
           )
         `);
@@ -354,15 +354,15 @@ export default function CustomerManagement() {
       const history = uniqueData.map((record: any) => {
         let dateStr = '未知日期';
         
-        // 尝试从培训开始时间获取日期
-        if (record.training_sessions?.start_time) {
+        // 尝试从培训开始日期获取日期
+        if (record.training_sessions?.date) {
           try {
-            const date = new Date(record.training_sessions.start_time);
+            const date = new Date(record.training_sessions.date);
             if (!isNaN(date.getTime())) {
               dateStr = date.toLocaleDateString('zh-CN');
             }
           } catch (e) {
-            console.warn('日期解析失败:', record.training_sessions.start_time);
+            console.warn('日期解析失败:', record.training_sessions.date);
           }
         }
         

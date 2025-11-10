@@ -31,8 +31,6 @@ const mockTrainingData = [
     id: 1,
     name: '前端开发进阶班',
     date: '2025-10-20',
-    startTime: '09:00',
-    endTime: '17:00',
     participants: 45,
     revenue: 45000,
     expert: '张教授',
@@ -49,8 +47,6 @@ const mockTrainingData = [
     id: 2,
     name: '项目管理实战',
     date: '2025-10-23',
-    startTime: '10:00',
-    endTime: '16:00',
     participants: 30,
     revenue: 36000,
     expert: '李博士',
@@ -66,8 +62,6 @@ const mockTrainingData = [
     id: 3,
     name: 'UI设计原理',
     date: '2025-10-28',
-    startTime: '09:30',
-    endTime: '17:30',
     participants: 25,
     revenue: 30000,
     expert: '王设计师',
@@ -82,8 +76,6 @@ const mockTrainingData = [
     id: 4,
     name: '数据分析与可视化',
     date: '2025-10-15',
-    startTime: '09:00',
-    endTime: '17:00',
     participants: 40,
     revenue: 40000,
     expert: '陈数据',
@@ -100,8 +92,6 @@ const mockTrainingData = [
     id: 5,
     name: '市场营销策略',
     date: '2025-10-18',
-    startTime: '10:00',
-    endTime: '16:00',
     participants: 35,
     revenue: 38500,
     expert: '赵市场',
@@ -690,10 +680,6 @@ export default function DataExport() {
                           <div className="flex items-center">
                             <Calendar size={14} className="mr-2 text-gray-400" />
                             {training.date}
-                          </div>
-                          <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            <Clock size={12} className="mr-2 text-gray-400" />
-                            {training.startTime} - {training.endTime}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

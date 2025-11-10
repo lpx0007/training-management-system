@@ -28,12 +28,12 @@ export const MENU_FEATURES: MenuFeature[] = [
     displayOrder: 1
   },
   {
-    id: 'customer_management',
-    name: '客户管理',
-    path: '/customer-management',
-    icon: 'users',
-    description: '管理客户信息和跟进记录',
-    requiredPermissions: ['customer_view'],
+    id: 'course_management',
+    name: '课程管理',
+    path: '/course-management',
+    icon: 'calendar',
+    description: '管理培训课程信息',
+    requiredPermissions: ['training_view'],
     displayOrder: 2
   },
   {
@@ -46,12 +46,12 @@ export const MENU_FEATURES: MenuFeature[] = [
     displayOrder: 3
   },
   {
-    id: 'expert_management',
-    name: '专家管理',
-    path: '/expert-management',
-    icon: 'user-tie',
-    description: '管理专家信息和课程',
-    requiredPermissions: ['expert_view'],
+    id: 'sales_tracking',
+    name: '销售追踪',
+    path: '/sales-tracking',
+    icon: 'chart-bar',
+    description: '查看销售数据和绩效',
+    requiredPermissions: ['salesperson_view_performance'],
     displayOrder: 4
   },
   {
@@ -64,13 +64,31 @@ export const MENU_FEATURES: MenuFeature[] = [
     displayOrder: 5
   },
   {
+    id: 'customer_management',
+    name: '客户管理',
+    path: '/customer-management',
+    icon: 'users',
+    description: '管理客户信息和跟进记录',
+    requiredPermissions: ['customer_view'],
+    displayOrder: 6
+  },
+  {
+    id: 'expert_management',
+    name: '专家管理',
+    path: '/expert-management',
+    icon: 'user-tie',
+    description: '管理专家信息和课程',
+    requiredPermissions: ['expert_view'],
+    displayOrder: 7
+  },
+  {
     id: 'prospectus_management',
     name: '招商简章',
     path: '/prospectus-management',
     icon: 'file-alt',
     description: '管理招商简章文件',
     requiredPermissions: ['prospectus_view'],
-    displayOrder: 6
+    displayOrder: 8
   },
   {
     id: 'poster_generator',
@@ -79,7 +97,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'image',
     description: '生成培训宣传海报',
     requiredPermissions: ['poster_generate'],
-    displayOrder: 7
+    displayOrder: 9
   },
   {
     id: 'data_management',
@@ -96,16 +114,16 @@ export const MENU_FEATURES: MenuFeature[] = [
       'performance_export',
       'data_download_template'
     ], // 拥有任一导入导出权限即可访问
-    displayOrder: 8
+    displayOrder: 10
   },
   {
-    id: 'sales_tracking',
-    name: '销售追踪',
-    path: '/sales-tracking',
-    icon: 'chart-bar',
-    description: '查看销售数据和绩效',
-    requiredPermissions: ['salesperson_view_performance'],
-    displayOrder: 9
+    id: 'announcement_management',
+    name: '公告管理',
+    path: '/announcement-management',
+    icon: 'bullhorn',
+    description: '发布和管理系统公告',
+    requiredPermissions: [], // 由路由层面的角色控制（仅管理员）
+    displayOrder: 11
   },
   {
     id: 'permission_management',
@@ -114,7 +132,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'shield-alt',
     description: '管理用户权限',
     requiredPermissions: ['permission_manage'],
-    displayOrder: 10
+    displayOrder: 12
   },
   {
     id: 'audit_logs',
@@ -123,7 +141,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'history',
     description: '查看系统操作日志',
     requiredPermissions: ['audit_log_view'],
-    displayOrder: 11
+    displayOrder: 13
   },
   {
     id: 'profile_settings',
@@ -132,7 +150,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'cog',
     description: '管理个人资料和偏好',
     requiredPermissions: [], // 所有角色都可访问
-    displayOrder: 12
+    displayOrder: 14
   }
 ];
 
@@ -154,6 +172,7 @@ export const ROLE_DEFAULT_MENU_FEATURES: Record<UserRole, string[]> = {
     'dashboard',
     'customer_management',
     'training_management',
+    'course_management',
     'expert_management',
     'prospectus_management',
     'profile_settings',
@@ -171,6 +190,7 @@ export const ROLE_DEFAULT_MENU_FEATURES: Record<UserRole, string[]> = {
     'dashboard',
     'customer_management',
     'training_management',
+    'course_management',
     'salesperson_management',
     'data_management',
     'profile_settings',

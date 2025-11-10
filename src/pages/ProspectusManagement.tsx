@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import prospectusService from '@/lib/supabase/prospectusService';
 import { supabase } from '@/lib/supabase/client';
 import type { Prospectus } from '@/lib/supabase/types';
+import { getStatusText, getStatusClassName, calculateTrainingStatus } from '@/utils/statusUtils';
 
 export default function ProspectusManagement() {
   const location = useLocation();
@@ -1331,7 +1332,7 @@ function DownloadHistoryModal({ isOpen, prospectus, onClose }: DownloadHistoryMo
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                          {record.training_session_id ? `培训 #${record.training_session_id}` : '-'}
+                          {record.training_session_name || '-'}
                         </td>
                       </tr>
                     ))}
@@ -1685,15 +1686,14 @@ function AdaptCoursesModal({ isOpen, prospectus, onClose, onSuccess }: AdaptCour
                           {formatDate(session.date)}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            session.status === 'completed'
-                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
-                              : session.status === 'upcoming'
-                              ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
-                              : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
-                          }`}>
-                            {session.status === 'completed' ? '已完成' : session.status === 'upcoming' ? '即将开始' : '进行中'}
-                          </span>
+                          {(() => {
+                            const realStatus = calculateTrainingStatus(session.date, session.end_date || undefined);
+                            return (
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusClassName(realStatus)}`}>
+                                {getStatusText(realStatus)}
+                              </span>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))}

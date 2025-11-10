@@ -185,8 +185,8 @@ export async function getMonthlyPerformance(
       
       const person = salesPersonMap.get(salespersonName);
       
-      // 从participant获取付款金额（直接使用payment_amount，与培训计划详情页一致）
-      const revenue = Number(participant.payment_amount) || 0;
+      // 从participant获取实收价格（使用actual_price，优惠后的价格，与培训计划详情页一致）
+      const revenue = Number(participant.actual_price || participant.payment_amount) || 0;
       
       console.log(`✅ 处理参与者 [${participant.name}]:`, {
         payment_amount: participant.payment_amount,
@@ -320,27 +320,55 @@ export async function getDepartmentPerformance(timeRange: string = '本月') {
 }
 
 // 获取课程业绩明细
-export async function getCoursePerformanceDetail(courseFilter: string = '全部', timeRange: string = '本月') {
+export async function getCoursePerformanceDetail(courseFilter: string = '全部', timeRange: string = '全部') {
   try {
-    // 计算时间范围
-    const now = new Date();
-    let startDate: Date, endDate: Date;
+    console.log('🔍 [课程销售明细] 查询参数:', {
+      timeRange,
+      courseFilter
+    });
+
+    // ✅ 新逻辑：显示所有课程（包括0报名），支持时间筛选
+    let startDateStr: string | null = null;
+    let endDateStr: string | null = null;
     
-    switch (timeRange) {
-      case '本月':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
-      case '上月':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // 计算时间范围（用于后续统计）
+    if (timeRange !== '全部') {
+      const now = new Date();
+      let startDate: Date, endDate: Date;
+      
+      switch (timeRange) {
+        case '本月':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          break;
+        case '上月':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+          break;
+        case '本季度':
+          const currentQuarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+          endDate = new Date(now.getFullYear(), currentQuarter * 3 + 3, 0);
+          break;
+        case '本年':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
+
+      startDateStr = startDate.toISOString().split('T')[0];
+      endDateStr = endDate.toISOString().split('T')[0];
+      
+      console.log('📅 查询日期范围:', `从 ${startDateStr} 到 ${endDateStr}`);
+    } else {
+      console.log('📅 查询范围: 全部课程（不限时间）');
     }
 
-    let query = supabase
+    // 第一步：查询所有培训（或根据培训日期筛选）
+    let sessionsQuery = supabase
       .from('training_sessions')
       .select(`
         id,
@@ -350,41 +378,100 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
         area,
         training_mode,
         online_price,
-        offline_price,
-        training_participants(
-          id,
-          salesperson_name,
-          participation_mode,
-          actual_price,
-          payment_amount
-        )
+        offline_price
       `)
-      .gte('date', startDate.toISOString())
-      .lte('date', endDate.toISOString())
       .order('date', { ascending: false });
+
+    // 如果选择了时间范围，按培训日期筛选
+    if (timeRange !== '全部' && startDateStr && endDateStr) {
+      sessionsQuery = sessionsQuery
+        .gte('date', startDateStr)
+        .lte('date', endDateStr);
+    }
 
     // 如果有课程筛选
     if (courseFilter !== '全部') {
-      query = query.eq('name', courseFilter);
+      sessionsQuery = sessionsQuery.eq('name', courseFilter);
     }
 
-    const { data, error } = await query;
+    const { data: sessionsData, error: sessionsError } = await sessionsQuery;
 
-    if (error) {
-      console.error('获取课程明细失败:', error);
+    if (sessionsError) {
+      console.error('❌ 获取培训场次失败:', sessionsError);
       return [];
     }
 
-    // 处理数据 - 按业务员分组
-    const courseDetails = data?.map((session: any) => {
-      const participants = session.training_participants || [];
-      const onlineCount = participants.filter((p: any) => p.participation_mode === 'online').length;
-      const offlineCount = participants.filter((p: any) => p.participation_mode === 'offline').length;
-      const totalRevenue = participants.reduce((sum: number, p: any) => sum + (Number(p.payment_amount) || 0), 0);
+    console.log('✅ [培训查询] 查询到培训数量:', sessionsData?.length || 0);
+    if (sessionsData && sessionsData.length > 0) {
+      console.log('📋 培训列表:', sessionsData.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        date: s.date
+      })));
+    }
+
+    if (!sessionsData || sessionsData.length === 0) {
+      console.warn('⚠️ 没有查询到任何培训');
+      return [];
+    }
+
+    // 第二步：查询所有培训的报名记录
+    const sessionIds = sessionsData.map((s: any) => s.id);
+    const { data: allParticipantsData, error: allParticipantsError } = await supabase
+      .from('training_participants')
+      .select(`
+        id,
+        training_session_id,
+        salesperson_name,
+        participation_mode,
+        actual_price,
+        payment_amount,
+        registration_date
+      `)
+      .in('training_session_id', sessionIds);
+
+    if (allParticipantsError) {
+      console.error('❌ 获取参训数据失败:', allParticipantsError);
+      return [];
+    }
+
+    console.log('✅ [参训记录查询] 获取到参训记录数:', allParticipantsData?.length || 0);
+
+    const allSessions = sessionsData;
+    console.log('📋 [最终结果] 总培训数量:', allSessions.length);
+    console.log('📋 [最终培训列表]:', allSessions.map((s: any) => s.name));
+
+    // 按培训场次ID分组报名记录
+    const sessionMap = new Map<number, any[]>();
+    allParticipantsData?.forEach((participant: any) => {
+      const sessionId = participant.training_session_id;
+      if (!sessionMap.has(sessionId)) {
+        sessionMap.set(sessionId, []);
+      }
+      sessionMap.get(sessionId)!.push(participant);
+    });
+
+    // 处理数据 - 按培训场次汇总
+    const courseDetails = allSessions.map((session: any) => {
+      const allParticipants = sessionMap.get(session.id) || [];
+      
+      // 如果选择了时间范围，只统计报名日期在范围内的参训人员
+      // 如果是"全部"，则统计所有参训人员
+      let rangeParticipants = allParticipants;
+      if (timeRange !== '全部' && startDateStr && endDateStr) {
+        rangeParticipants = allParticipants.filter((p: any) => {
+          const regDate = p.registration_date;
+          return regDate >= startDateStr && regDate <= endDateStr;
+        });
+      }
+
+      const onlineCount = rangeParticipants.filter((p: any) => p.participation_mode === 'online').length;
+      const offlineCount = rangeParticipants.filter((p: any) => p.participation_mode === 'offline').length;
+      const totalRevenue = rangeParticipants.reduce((sum: number, p: any) => sum + (Number(p.actual_price || p.payment_amount) || 0), 0);
 
       // 按业务员分组统计
       const salespersonStats = new Map();
-      participants.forEach((p: any) => {
+      rangeParticipants.forEach((p: any) => {
         const spName = p.salesperson_name || '未分配';
         if (!salespersonStats.has(spName)) {
           salespersonStats.set(spName, {
@@ -395,7 +482,7 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
         }
         const stats = salespersonStats.get(spName);
         stats.count += 1;
-        stats.revenue += Number(p.payment_amount) || 0;
+        stats.revenue += Number(p.actual_price || p.payment_amount) || 0;
       });
 
       // 转换为数组并计算占比
@@ -417,16 +504,27 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
         offlinePrice: session.offline_price || 0,
         onlineParticipants: onlineCount,
         offlineParticipants: offlineCount,
-        totalParticipants: participants.length,
+        totalParticipants: rangeParticipants.length,
         revenue: totalRevenue,
         status: new Date(session.date) < new Date() ? '已完成' : '进行中',
         salespersonList // 业务员明细列表
       };
-    }) || [];
+    });
 
-    return courseDetails;
+    // 按培训日期降序排序
+    const sortedDetails = courseDetails.sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+    
+    console.log('🎉 [最终返回] 课程销售明细数量:', sortedDetails.length);
+    console.log('📊 [课程明细汇总]:', sortedDetails.map((d: any) => ({
+      name: d.courseName,
+      date: d.sessionDate,
+      participants: d.totalParticipants,
+      revenue: d.revenue
+    })));
+    
+    return sortedDetails;
   } catch (error) {
-    console.error('获取课程明细失败:', error);
+    console.error('❌ 获取课程明细失败:', error);
     return [];
   }
 }

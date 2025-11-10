@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, Fragment } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
@@ -35,10 +35,11 @@ export default function SalesTracking() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm] = useState(''); // 未使用的搜索功能，保留以避免useEffect报错
   const [selectedDepartment] = useState('全部'); // 未使用的筛选功能，保留以避免useEffect报错
-  const [selectedTimeRange, setSelectedTimeRange] = useState('本月');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('全部');
   const [selectedCourse] = useState('全部'); // 未使用的课程筛选，保留以避免useEffect报错
   const [activeTab, setActiveTab] = useState<'ranking' | 'detail'>('ranking'); // Tab切换
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set()); // 展开的课程
+  const [expandedDetailCourses, setExpandedDetailCourses] = useState<Set<string>>(new Set()); // 详情框中展开的课程
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [selectedSalesperson, setSelectedSalesperson] = useState<SalesPersonData | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -615,8 +616,22 @@ export default function SalesTracking() {
         {/* Tab 2: 课程销售明细 */}
         {activeTab === 'detail' && (
           <div>
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
               <h3 className="font-semibold text-gray-800 dark:text-white">课程销售明细</h3>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">时间范围:</label>
+                <select
+                  value={selectedTimeRange}
+                  onChange={(e) => setSelectedTimeRange(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="全部">全部</option>
+                  <option value="本月">本月</option>
+                  <option value="上月">上月</option>
+                  <option value="本季度">本季度</option>
+                  <option value="本年">本年</option>
+                </select>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -656,8 +671,8 @@ export default function SalesTracking() {
                   courseDetails.map((course: any) => {
                     const isExpanded = expandedCourses.has(course.id);
                     return (
-                      <>
-                        <tr key={course.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <Fragment key={course.id}>
+                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             {course.courseName}
                           </td>
@@ -752,7 +767,7 @@ export default function SalesTracking() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })
                 ) : (
@@ -869,43 +884,105 @@ export default function SalesTracking() {
 
               <div className="mb-6">
                 <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
-                  成交客户列表 ({selectedSalesperson.completedCustomers}次成交)
+                  成交客户列表（按课程） ({selectedSalesperson.completedCustomers}次成交)
                 </h4>
                 <div className="space-y-3">
                   {selectedSalesperson.completedCustomerList && selectedSalesperson.completedCustomerList.length > 0 ? (
                     <>
-                      {selectedSalesperson.completedCustomerList.map((customer: any, index: number) => (
-                        <div key={`${customer.id}-${index}`} className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                            <UserCheck size={20} />
-                          </div>
-                          <div className="ml-3 flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-800 dark:text-white">
-                                {customer.name}
-                              </p>
-                              <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                                ¥{customer.amount?.toLocaleString() || 0}
-                              </span>
+                      {(() => {
+                        // 按课程分组客户
+                        const courseGroups = new Map<string, any[]>();
+                        selectedSalesperson.completedCustomerList.forEach((customer: any) => {
+                          const courseName = customer.courseName || '未知课程';
+                          if (!courseGroups.has(courseName)) {
+                            courseGroups.set(courseName, []);
+                          }
+                          courseGroups.get(courseName)!.push(customer);
+                        });
+                        
+                        return Array.from(courseGroups.entries()).map(([courseName, customers]) => {
+                          const isExpanded = expandedDetailCourses.has(courseName);
+                          const totalRevenue = customers.reduce((sum, c) => sum + (c.amount || 0), 0);
+                          const customerCount = customers.length;
+                          
+                          return (
+                            <div key={courseName} className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                              {/* 课程汇总行 */}
+                              <div 
+                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedDetailCourses);
+                                  if (isExpanded) {
+                                    newExpanded.delete(courseName);
+                                  } else {
+                                    newExpanded.add(courseName);
+                                  }
+                                  setExpandedDetailCourses(newExpanded);
+                                }}
+                              >
+                                <div className="flex items-center flex-1">
+                                  {isExpanded ? (
+                                    <ChevronDown size={20} className="text-gray-500 dark:text-gray-400 mr-2" />
+                                  ) : (
+                                    <ChevronRight size={20} className="text-gray-500 dark:text-gray-400 mr-2" />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                                      {courseName}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      {customerCount} 次成交
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                                    ¥{totalRevenue.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {/* 展开的客户列表 */}
+                              {isExpanded && (
+                                <div className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                  {customers.map((customer: any, index: number) => (
+                                    <div key={`${customer.id}-${index}`} className="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                        <UserCheck size={16} />
+                                      </div>
+                                      <div className="ml-3 flex-1">
+                                        <div className="flex items-center justify-between">
+                                          <p className="text-sm font-medium text-gray-800 dark:text-white">
+                                            {customer.name}
+                                          </p>
+                                          <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                                            ¥{customer.amount?.toLocaleString() || 0}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center mt-1">
+                                          <span className="text-xs text-gray-500 dark:text-gray-400 mr-4">
+                                            <i className="fas fa-phone mr-1"></i>
+                                            {customer.phone || '未填写'}
+                                          </span>
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            <i className="fas fa-calendar mr-1"></i>
+                                            {customer.latestDate ? new Date(customer.latestDate).toLocaleDateString('zh-CN') : '-'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 text-xs rounded-full">
+                                          已成交
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center mt-1">
-                              <span className="text-xs text-gray-500 dark:text-gray-400 mr-4">
-                                <i className="fas fa-book mr-1"></i>
-                                {customer.courseName || '未知课程'}
-                              </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                <i className="fas fa-calendar mr-1"></i>
-                                {customer.latestDate ? new Date(customer.latestDate).toLocaleDateString('zh-CN') : '-'}
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 text-xs rounded-full">
-                              已成交
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        });
+                      })()}
                     </>
                   ) : (
                     <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-8">

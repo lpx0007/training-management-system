@@ -72,10 +72,8 @@ GIT_COMMIT_CHECKLIST.md
 .cascade/
 .kiro/
 *.cjs
-*.ps1
 verify-*.cjs
 install-guide.md
 ROUTE_PERMISSION_AUDIT.md
 项目分析报告.md
 supabase配置说明.txt
-supabase-mcp.ps1

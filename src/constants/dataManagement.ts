@@ -2,11 +2,6 @@ import type { DataType, ColumnDefinition } from '@/types/dataManagement';
 
 // 数据类型配置
 export const DATA_TYPE_CONFIG = {
-  courses: {
-    label: '培训课程',
-    icon: 'BookOpen',
-    description: '批量导入或导出培训课程信息'
-  },
   experts: {
     label: '专家信息',
     icon: 'UserCheck',
@@ -43,14 +38,19 @@ export const DATA_TYPE_CONFIG = {
 export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
   courses: {
     id: '课程ID',
+    module: '模块',
     name: '课程名称',
+    code: '课程编号',
+    duration_days: '每期天数',
+    sessions_per_year: '全年期数',
+    standard_fee: '标准培训费',
+    online_price: '线上价格',
+    offline_price: '线下价格',
+    average_price: '均价',
     description: '课程描述',
-    duration: '时长（小时）',
-    price: '价格（元）',
-    category: '课程分类',
-    expert_id: '授课专家ID',
-    created_at: '创建时间',
-    updated_at: '更新时间'
+    notes: '备注',
+    status: '状态',
+    created_at: '创建时间'
   },
   experts: {
     id: '专家ID',
@@ -100,19 +100,16 @@ export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
     name: '培训名称',
     date: '开始日期',
     end_date: '结束日期',
-    start_time: '开始时间',
-    end_time: '结束时间',
     participants: '参训人数',
-    expert_id: '专家ID',
-    expert_name: '专家姓名',
-    area: '举办地区',
-    revenue: '销售额',
+    expert_name: '专家名称',
+    area: '培训地点',
+    revenue: '收入',
     status: '状态',
     rating: '评分',
-    salesperson_id: '负责业务员ID',
-    salesperson_name: '负责业务员',
+    salesperson_name: '负责人',
     course_id: '关联课程ID',
-    course_description: '课程描述',
+    course_name: '课程名称',
+    session_number: '第几期',
     capacity: '容纳人数',
     created_at: '创建时间'
   },
@@ -146,18 +143,22 @@ export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
 // 模板列定义
 export const TEMPLATE_COLUMNS: Record<DataType, ColumnDefinition[]> = {
   courses: [
-    { key: 'id', label: '课程ID', required: true, width: 15 },
-    { key: 'name', label: '课程名称', required: true, width: 20 },
-    { key: 'description', label: '课程描述', required: false, width: 30 },
-    { key: 'duration', label: '时长（小时）', required: false, width: 12 },
-    { key: 'price', label: '价格（元）', required: false, width: 12 },
-    { key: 'category', label: '课程分类', required: false, width: 15, options: ['技术培训', '管理培训', '销售培训', '其他'] },
-    { key: 'expert_id', label: '授课专家ID', required: false, width: 15 }
+    { key: 'module', label: '模块', required: true, width: 15 },
+    { key: 'name', label: '课程名称', required: true, width: 30 },
+    { key: 'code', label: '课程编号', required: false, width: 15 },
+    { key: 'duration_days', label: '每期天数', required: true, width: 12 },
+    { key: 'sessions_per_year', label: '全年期数', required: true, width: 12 },
+    { key: 'standard_fee', label: '标准培训费', required: false, width: 15 },
+    { key: 'online_price', label: '线上价格', required: false, width: 15 },
+    { key: 'offline_price', label: '线下价格', required: false, width: 15 },
+    { key: 'description', label: '课程描述', required: false, width: 40 },
+    { key: 'notes', label: '备注', required: false, width: 30 },
+    { key: 'status', label: '状态', required: false, width: 12, options: ['active', 'inactive', 'archived'] }
   ],
   experts: [
     { key: 'name', label: '专家姓名', required: true, width: 15 },
-    { key: 'email', label: '邮箱', required: true, width: 20 },  // ✅ 改为必填，移到前面
-    { key: 'phone', label: '手机号', required: true, width: 15 },  // ✅ 改为必填，移到前面
+    { key: 'email', label: '邮箱', required: true, width: 20 },  // 
+    { key: 'phone', label: '手机号', required: true, width: 15 },  // 
     { key: 'title', label: '职称', required: false, width: 15 },
     { key: 'field', label: '专业领域', required: false, width: 15 },
     { key: 'experience', label: '工作经验', required: false, width: 20 },
@@ -193,9 +194,7 @@ export const TEMPLATE_COLUMNS: Record<DataType, ColumnDefinition[]> = {
   training_sessions: [
     { key: 'name', label: '培训名称', required: true, width: 20 },
     { key: 'date', label: '开始日期', required: true, width: 15 },
-    { key: 'end_time', label: '结束时间', required: true, width: 12 },
     { key: 'end_date', label: '结束日期', required: false, width: 15 },
-    { key: 'start_time', label: '开始时间', required: false, width: 12 },
     { key: 'participants', label: '参训人数', required: false, width: 12 },
     { key: 'expert_name', label: '专家姓名', required: false, width: 15 },
     { key: 'area', label: '举办地区', required: false, width: 15 },
@@ -214,9 +213,9 @@ export const TEMPLATE_COLUMNS: Record<DataType, ColumnDefinition[]> = {
 // 示例数据
 export const EXAMPLE_DATA: Record<DataType, any[]> = {
   courses: [
-    { id: 'COURSE001', name: '前端开发进阶', description: 'React + TypeScript 实战', duration: 16, price: 3000, category: '技术培训', expert_id: 1 },
-    { id: 'COURSE002', name: '项目管理实战', description: 'PMP 认证培训', duration: 24, price: 5000, category: '管理培训', expert_id: 2 },
-    { id: 'COURSE003', name: 'UI设计原理', description: 'Figma 设计实战', duration: 12, price: 2500, category: '技术培训', expert_id: 3 }
+    { module: '综合管理', name: '首席财务官高级研修班', code: 'CFO-001', duration_days: 15, sessions_per_year: 1, standard_fee: 44800, online_price: 44800, offline_price: 44800, description: '高级财务管理培训', notes: '针对高管', status: 'active' },
+    { module: '非财高管', name: '非财高管的财报分析与管理决策', code: 'NFM-001', duration_days: 2, sessions_per_year: 2, standard_fee: 9800, online_price: 8800, offline_price: 9800, description: '非财务高管培训', notes: '', status: 'active' },
+    { module: '管理会计', name: '业财融合实务与财务BP核心能力建设', code: 'MA-001', duration_days: 3, sessions_per_year: 2, standard_fee: 6000, online_price: 5100, offline_price: 6000, description: '业财融合培训', notes: '', status: 'active' }
   ],
   experts: [
     { name: '张教授', title: '高级工程师', field: '前端开发', experience: '10年', rating: 4.8, courses: 'React,Vue,Angular', location: '北京', available: '是', bio: '资深前端专家', email: 'zhang@example.com', phone: '13800138000' },
@@ -234,9 +233,9 @@ export const EXAMPLE_DATA: Record<DataType, any[]> = {
     { name: '王五', phone: '13400134000', email: 'wangwu@company.com', department: '销售部', position: '销售专员', join_date: '2024-06-10', status: 'pending', team: 'A组' }
   ],
   training_sessions: [
-    { name: '前端开发进阶班', date: '2025-11-01', end_time: '17:00', end_date: '2025-11-01', start_time: '09:00', participants: 30, expert_name: '张教授', area: '北京', revenue: 90000, status: '计划中', rating: null, salesperson_name: '张三', course_id: 'COURSE001', course_description: 'React实战', capacity: 40 },
-    { name: '项目管理实战班', date: '2025-11-05', end_time: '16:00', end_date: '2025-11-05', start_time: '10:00', participants: 25, expert_name: '李博士', area: '上海', revenue: 125000, status: '计划中', rating: null, salesperson_name: '李四', course_id: 'COURSE002', course_description: 'PMP认证', capacity: 30 },
-    { name: 'UI设计原理班', date: '2025-11-10', end_time: '17:30', end_date: '2025-11-10', start_time: '09:30', participants: 20, expert_name: '王设计师', area: '广州', revenue: 50000, status: '计划中', rating: null, salesperson_name: '王五', course_id: 'COURSE003', course_description: 'Figma设计', capacity: 25 }
+    { name: '前端开发进阶班', date: '2025-11-01', end_date: '2025-11-01', participants: 30, expert_name: '张教授', area: '北京', revenue: 90000, status: '计划中', rating: null, salesperson_name: '张三', course_id: 'COURSE001', course_description: 'React实战', capacity: 40 },
+    { name: '项目管理实战班', date: '2025-11-05', end_date: '2025-11-05', participants: 25, expert_name: '李博士', area: '上海', revenue: 125000, status: '计划中', rating: null, salesperson_name: '李四', course_id: 'COURSE002', course_description: 'PMP认证', capacity: 30 },
+    { name: 'UI设计原理班', date: '2025-11-10', end_date: '2025-11-10', participants: 20, expert_name: '王设计师', area: '广州', revenue: 50000, status: '计划中', rating: null, salesperson_name: '王五', course_id: 'COURSE003', course_description: 'Figma设计', capacity: 25 }
   ],
   salesperson_performance: [],
   course_sales_performance: []

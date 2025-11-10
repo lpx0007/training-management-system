@@ -179,9 +179,6 @@ export default function Dashboard() {
                                 <div className="flex items-center">
                                   <Calendar size={14} className="mr-2 flex-shrink-0 text-gray-400" />
                                   <span>{training.date}</span>
-                                  {training.startTime && (
-                                    <span className="ml-2">{training.startTime} - {training.endTime}</span>
-                                  )}
                                 </div>
                                 <div className="flex items-center">
                                   <Users size={14} className="mr-2 flex-shrink-0 text-gray-400" />

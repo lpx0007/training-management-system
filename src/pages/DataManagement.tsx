@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useMemo } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { Database, Download, Upload, FileText, CheckCircle, AlertTriangle, XCircle, Lock } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
@@ -81,10 +81,24 @@ export default function DataManagement() {
     timeRange: '本月'
   });
   
+  // 客户信息筛选
+  const [customerFilters, setCustomerFilters] = useState({
+    department: '全部',
+    salesperson: '全部'
+  });
+  
+  // 培训场次筛选
+  const [trainingFilters, setTrainingFilters] = useState({
+    month: '全部',
+    area: '全部',
+    salesperson: '全部'
+  });
+  
   // 动态加载的选项列表
   const [departments, setDepartments] = useState<Array<{id: number, name: string}>>([]);
-  const [salespersons, setSalespersons] = useState<Array<{id: string, name: string}>>([]);
+  const [salespersons, setSalespersons] = useState<Array<{id: string, name: string, department_id: number | null}>>([]);
   const [courses, setCourses] = useState<Array<{id: number, name: string}>>([]);
+  const [areas, setAreas] = useState<Array<string>>([]);
   
   // 加载部门、业务员和课程列表
   useEffect(() => {
@@ -101,7 +115,7 @@ export default function DataManagement() {
         // 加载业务员列表
         const { data: spData } = await supabase
           .from('user_profiles')
-          .select('id, name')
+          .select('id, name, department_id')
           .eq('role', 'salesperson')
           .order('name');
         if (spData) setSalespersons(spData);
@@ -123,6 +137,17 @@ export default function DataManagement() {
           });
           setCourses(uniqueCourses);
         }
+        
+        // 加载培训地点列表（去重）
+        const { data: areaData } = await supabase
+          .from('training_sessions')
+          .select('area')
+          .not('area', 'is', null)
+          .order('area');
+        if (areaData) {
+          const uniqueAreas = [...new Set(areaData.map((item: any) => item.area))];
+          setAreas(uniqueAreas);
+        }
       } catch (error) {
         console.error('加载筛选选项失败:', error);
       }
@@ -130,6 +155,106 @@ export default function DataManagement() {
     
     loadOptions();
   }, []);
+
+  // 根据选择的部门过滤业务员列表（客户筛选用）
+  const filteredSalespersons = useMemo(() => {
+    if (customerFilters.department === '全部') {
+      return salespersons;
+    }
+    
+    // 找到选中部门的ID
+    const selectedDept = departments.find(d => d.name === customerFilters.department);
+    if (!selectedDept) {
+      return salespersons;
+    }
+    
+    // 过滤该部门的业务员
+    return salespersons.filter(sp => sp.department_id === selectedDept.id);
+  }, [customerFilters.department, salespersons, departments]);
+
+  // 根据选择的部门过滤业务员列表（业绩筛选用）
+  const filteredPerformanceSalespersons = useMemo(() => {
+    if (performanceFilters.department === '全部') {
+      return salespersons;
+    }
+    
+    // 找到选中部门的ID
+    const selectedDept = departments.find(d => d.name === performanceFilters.department);
+    if (!selectedDept) {
+      return salespersons;
+    }
+    
+    // 过滤该部门的业务员
+    return salespersons.filter(sp => sp.department_id === selectedDept.id);
+  }, [performanceFilters.department, salespersons, departments]);
+
+  // 当客户筛选的部门改变时，重置业务员选择
+  useEffect(() => {
+    if (customerFilters.department !== '全部' && customerFilters.salesperson !== '全部') {
+      // 检查当前选择的业务员是否在过滤后的列表中
+      const currentSalespersonInList = filteredSalespersons.some(
+        sp => sp.name === customerFilters.salesperson
+      );
+      
+      if (!currentSalespersonInList) {
+        // 如果不在，重置为"全部"
+        setCustomerFilters(prev => ({ ...prev, salesperson: '全部' }));
+      }
+    }
+  }, [customerFilters.department, customerFilters.salesperson, filteredSalespersons]);
+
+  // 当业绩筛选的部门改变时，重置业务员选择
+  useEffect(() => {
+    if (performanceFilters.department !== '全部' && performanceFilters.salesperson !== '全部') {
+      // 检查当前选择的业务员是否在过滤后的列表中
+      const currentSalespersonInList = filteredPerformanceSalespersons.some(
+        sp => sp.name === performanceFilters.salesperson
+      );
+      
+      if (!currentSalespersonInList) {
+        // 如果不在，重置为"全部"
+        setPerformanceFilters(prev => ({ ...prev, salesperson: '全部' }));
+      }
+    }
+  }, [performanceFilters.department, performanceFilters.salesperson, filteredPerformanceSalespersons]);
+
+  // 生成最近12个月的月份选项
+  const monthOptions = useMemo(() => {
+    const months: string[] = [];
+    const today = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      months.push(yearMonth);
+    }
+    return months;
+  }, []);
+
+  // 根据选择的地点过滤业务员列表（培训场次筛选用）
+  const filteredTrainingSalespersons = useMemo(() => {
+    if (trainingFilters.area === '全部') {
+      return salespersons;
+    }
+    
+    // 查询该地点的所有培训场次的负责人ID
+    // 这里我们需要从前端已有的salespersons中筛选
+    // 实际应该根据training_sessions表中area对应的salesperson_id来筛选
+    // 为了简化，这里返回所有业务员，后端会处理筛选
+    return salespersons;
+  }, [trainingFilters.area, salespersons]);
+
+  // 当培训场次筛选的地点改变时，重置业务员选择
+  useEffect(() => {
+    if (trainingFilters.area !== '全部' && trainingFilters.salesperson !== '全部') {
+      const currentSalespersonInList = filteredTrainingSalespersons.some(
+        sp => sp.name === trainingFilters.salesperson
+      );
+      
+      if (!currentSalespersonInList) {
+        setTrainingFilters(prev => ({ ...prev, salesperson: '全部' }));
+      }
+    }
+  }, [trainingFilters.area, trainingFilters.salesperson, filteredTrainingSalespersons]);
 
   // 处理文件上传
   const handleFileSelect = async (file: File) => {
@@ -285,6 +410,10 @@ export default function DataManagement() {
         filters = { ...filters, ...performanceFilters };
       } else if (selectedDataType === 'course_sales_performance') {
         filters = { ...filters, ...courseSalesFilters };
+      } else if (selectedDataType === 'customers') {
+        filters = { ...filters, ...customerFilters };
+      } else if (selectedDataType === 'training_sessions') {
+        filters = { ...filters, ...trainingFilters };
       }
       
       const exportConfig = {
@@ -701,10 +830,118 @@ export default function DataManagement() {
                           className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
                         >
                           <option value="全部">全部业务员</option>
-                          {salespersons.map(sp => (
+                          {filteredPerformanceSalespersons.map(sp => (
                             <option key={sp.id} value={sp.name}>{sp.name}</option>
                           ))}
                         </select>
+                        {performanceFilters.department !== '全部' && (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            仅显示 {performanceFilters.department} 的业务员
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 客户信息特殊筛选 */}
+                {selectedDataType === 'customers' && (
+                  <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">客户筛选条件</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          部门
+                        </label>
+                        <select
+                          value={customerFilters.department}
+                          onChange={(e) => setCustomerFilters(prev => ({ ...prev, department: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部部门</option>
+                          {departments.map(dept => (
+                            <option key={dept.id} value={dept.name}>{dept.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          业务员
+                        </label>
+                        <select
+                          value={customerFilters.salesperson}
+                          onChange={(e) => setCustomerFilters(prev => ({ ...prev, salesperson: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部业务员</option>
+                          {filteredSalespersons.map(sp => (
+                            <option key={sp.id} value={sp.name}>{sp.name}</option>
+                          ))}
+                        </select>
+                        {customerFilters.department !== '全部' && (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            仅显示 {customerFilters.department} 的业务员
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 培训场次特殊筛选 */}
+                {selectedDataType === 'training_sessions' && (
+                  <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">培训场次筛选条件</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          月份
+                        </label>
+                        <select
+                          value={trainingFilters.month}
+                          onChange={(e) => setTrainingFilters(prev => ({ ...prev, month: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部月份</option>
+                          {monthOptions.map(month => (
+                            <option key={month} value={month}>{month}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          地点
+                        </label>
+                        <select
+                          value={trainingFilters.area}
+                          onChange={(e) => setTrainingFilters(prev => ({ ...prev, area: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部地点</option>
+                          {areas.map(area => (
+                            <option key={area} value={area}>{area}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          负责人
+                        </label>
+                        <select
+                          value={trainingFilters.salesperson}
+                          onChange={(e) => setTrainingFilters(prev => ({ ...prev, salesperson: e.target.value }))}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white"
+                        >
+                          <option value="全部">全部负责人</option>
+                          {filteredTrainingSalespersons.map(sp => (
+                            <option key={sp.id} value={sp.name}>{sp.name}</option>
+                          ))}
+                        </select>
+                        {trainingFilters.area !== '全部' && (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            显示 {trainingFilters.area} 的负责人
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

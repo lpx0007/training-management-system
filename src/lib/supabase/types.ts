@@ -61,6 +61,7 @@ export interface ProspectusDownload {
   file_type: 'original' | 'sealed';
   downloaded_at: string;
   training_session_id: number | null;
+  training_session_name?: string | null;  // 关联的培训名称
   created_at: string;
 }
 
@@ -131,8 +132,8 @@ export interface SalespersonPerformance {
   updated_at: string;
 }
 
-// 课程
-export interface Course {
+// 课程（旧版，已废弃）
+export interface LegacyCourse {
   id: string;
   name: string;
   description: string | null;
@@ -144,14 +145,61 @@ export interface Course {
   updated_at: string;
 }
 
+// 课程（数据库字段）
+export interface CourseDB {
+  id: number;
+  module: string;
+  name: string;
+  code?: string | null;
+  duration_days: number;
+  sessions_per_year: number;
+  standard_fee?: number | null;
+  online_price?: number | null;
+  offline_price?: number | null;
+  average_price?: number | null;
+  description?: string | null;
+  notes?: string | null;
+  status: string;
+  project_manager_id?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+// 课程（前端类型）
+export interface Course {
+  id: number;
+  module: string;
+  name: string;
+  code?: string;
+  durationDays: number;
+  sessionsPerYear: number;
+  standardFee?: number;
+  onlinePrice?: number;
+  offlinePrice?: number;
+  averagePrice?: number;
+  description?: string;
+  notes?: string;
+  status: 'active' | 'inactive' | 'archived';
+  projectManagerId?: string;
+  projectManagerName?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// 课程与场次汇总
+export interface CourseWithSessions extends Course {
+  sessions: TrainingSessionFrontend[];
+  actualSessionCount: number;
+  totalParticipants: number;
+  totalRevenue: number;
+}
+
 // 培训场次（数据库字段）
 export interface TrainingSession {
   id: number;
   name: string;
   date: string;
   end_date: string | null;
-  start_time: string | null;
-  end_time: string | null;
   capacity: number; // 容纳人数
   participants: number;
   expert_id: number | null;
@@ -163,29 +211,42 @@ export interface TrainingSession {
   rating: number | null;
   salesperson_id: string | null;  // 改为 UUID
   salesperson_name: string | null;
-  course_id: string | null;
+  course_id: number | null;       // 关联课程ID
+  course_name: string | null;      // 冗余：课程名称
+  session_number: number | null;   // 第几期
   course_description: string | null;
   prospectus_id: number | null;  // 招商简章ID
   training_mode: string | null;  // 培训模式：online/offline/mixed
   online_price: number | null;   // 线上价格
   offline_price: number | null;  // 线下价格
+  auto_calculate_revenue: boolean | null;  // 自动计算收入
   created_at: string;
+  // 软删除字段
+  deleted_at: string | null;      // 删除时间
+  deleted_by: string | null;      // 删除人ID（UUID）
+  deleted_by_name: string | null; // 删除人姓名
+  delete_reason: string | null;   // 删除原因
 }
 
 // 培训场次（前端友好类型，包含驼峰命名字段）
-export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'start_time' | 'end_time' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id'> {
+export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_name' | 'session_number' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id' | 'deleted_at' | 'deleted_by' | 'deleted_by_name' | 'delete_reason'> {
   expertId: number | null;
   expert: string;
-  startTime: string;
-  endTime: string;
   endDate: string | null;
   detailedAddress: string | null;
   salespersonId: string | null;  // 改为 UUID
   salespersonName: string | null;
-  courseId: string | null;
+  courseId: number | null;        // 关联课程ID
+  courseName: string | null;      // 课程名称
+  sessionNumber: number;          // 第几期
   courseDescription: string | null;
   prospectusId: number | null;  // 招商简章ID
   createdAt: string;
+  // 软删除字段（驼峰命名）
+  deletedAt: string | null;
+  deletedBy: string | null;
+  deletedByName: string | null;
+  deleteReason: string | null;
   participantsList?: TrainingParticipantFrontend[];
 }
 
@@ -202,6 +263,8 @@ export interface TrainingParticipant {
   salesperson_name: string | null;
   participation_mode: string | null;  // 参与方式：online/offline
   payment_amount: number | null;      // 付款金额
+  actual_price: number | null;        // 实际价格（优惠后）
+  discount_rate: number | null;       // 折扣率（百分比）
   created_at: string;
 }
 
@@ -218,6 +281,8 @@ export interface TrainingParticipantFrontend {
   salespersonName: string | null;
   participationMode: string | null;   // 参与方式：online/offline
   paymentAmount: number | null;       // 付款金额
+  actualPrice: number | null;         // 实际价格（优惠后）
+  discountRate: number | null;        // 折扣率（百分比）
   createdAt: string;
 }
 
@@ -273,8 +338,6 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     name: dbSession.name,
     date: dbSession.date,
     endDate: dbSession.end_date,
-    startTime: dbSession.start_time || '09:00',
-    endTime: dbSession.end_time || '17:00',
     capacity: dbSession.capacity || 30,
     participants: dbSession.participants,
     expertId: dbSession.expert_id,
@@ -287,13 +350,43 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     salespersonId: dbSession.salesperson_id,
     salespersonName: dbSession.salesperson_name,
     courseId: dbSession.course_id,
+    courseName: dbSession.course_name,      // 新增
+    sessionNumber: dbSession.session_number || 1,  // 新增
     courseDescription: dbSession.course_description,
     prospectusId: dbSession.prospectus_id,
     training_mode: dbSession.training_mode,
     online_price: dbSession.online_price,
     offline_price: dbSession.offline_price,
+    auto_calculate_revenue: dbSession.auto_calculate_revenue,
     createdAt: dbSession.created_at,
+    // 软删除字段
+    deletedAt: dbSession.deleted_at,
+    deletedBy: dbSession.deleted_by,
+    deletedByName: dbSession.deleted_by_name,
+    deleteReason: dbSession.delete_reason,
     participantsList: []
+  };
+}
+
+// 课程类型转换
+export function dbToFrontendCourse(dbCourse: CourseDB): Course {
+  return {
+    id: dbCourse.id,
+    module: dbCourse.module,
+    name: dbCourse.name,
+    code: dbCourse.code || undefined,
+    durationDays: dbCourse.duration_days,
+    sessionsPerYear: dbCourse.sessions_per_year,
+    standardFee: dbCourse.standard_fee || undefined,
+    onlinePrice: dbCourse.online_price || undefined,
+    offlinePrice: dbCourse.offline_price || undefined,
+    averagePrice: dbCourse.average_price || undefined,
+    description: dbCourse.description || undefined,
+    notes: dbCourse.notes || undefined,
+    status: (dbCourse.status as 'active' | 'inactive' | 'archived') || 'active',
+    projectManagerId: dbCourse.project_manager_id || undefined,
+    createdAt: dbCourse.created_at,
+    updatedAt: dbCourse.updated_at || undefined,
   };
 }
 
@@ -310,6 +403,8 @@ export function dbToFrontendTrainingParticipant(dbParticipant: TrainingParticipa
     salespersonName: dbParticipant.salesperson_name,
     participationMode: dbParticipant.participation_mode,
     paymentAmount: dbParticipant.payment_amount,
+    actualPrice: dbParticipant.actual_price,
+    discountRate: dbParticipant.discount_rate,
     createdAt: dbParticipant.created_at
   };
 }

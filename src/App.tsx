@@ -15,8 +15,10 @@ import AnnouncementManagement from "@/pages/AnnouncementManagement";
 import NotificationCenter from "@/pages/NotificationCenter";
 import AnnouncementList from "@/pages/AnnouncementList";
 import PosterGenerator from "@/pages/PosterGenerator";
-import ProspectusManagement from "@/pages/ProspectusManagement";
-import InitDepartmentManager from "@/pages/InitDepartmentManager";
+import ProspectusManagement from '@/pages/ProspectusManagement';
+import InitDepartmentManager from '@/pages/InitDepartmentManager';
+import CourseManagement from '@/pages/CourseManagement';
+import AuditLogs from '@/pages/AuditLogs';
 import { useState, useEffect } from "react";
 import { AuthContext, User } from '@/contexts/authContext';
 import { toast } from 'sonner';
@@ -419,6 +421,11 @@ export default function App() {
             <TrainingPerformance />
           </ProtectedRoute>
         } />
+        <Route path="/course-management" element={
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager']}>
+            <CourseManagement />
+          </ProtectedRoute>
+        } />
         <Route path="/expert-management" element={
           <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
             <ExpertManagement />
@@ -487,6 +494,11 @@ export default function App() {
         <Route path="/init-department-manager" element={
           <ProtectedRoute requiredRole={['admin']}>
             <InitDepartmentManager />
+          </ProtectedRoute>
+        } />
+        <Route path="/audit-logs" element={
+          <ProtectedRoute requiredRole={['admin']}>
+            <AuditLogs />
           </ProtectedRoute>
         } />
       </Routes>

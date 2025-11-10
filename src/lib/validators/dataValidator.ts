@@ -79,80 +79,6 @@ export function convertToBoolean(value: any): boolean {
 
 // 数据类型特定验证器
 
-// 验证培训课程
-export async function validateCourse(row: any, rowIndex: number): Promise<ValidationResult[]> {
-  const errors: ValidationResult[] = [];
-  
-  // 必填字段验证
-  if (!row.id) {
-    errors.push({
-      row: rowIndex,
-      column: 'id',
-      error: '课程ID为必填项',
-      severity: 'error'
-    });
-  }
-  
-  if (!row.name) {
-    errors.push({
-      row: rowIndex,
-      column: 'name',
-      error: '课程名称为必填项',
-      severity: 'error'
-    });
-  }
-  
-  // 时长验证
-  if (row.duration && !validatePositiveInteger(row.duration)) {
-    errors.push({
-      row: rowIndex,
-      column: 'duration',
-      error: '时长必须是正整数',
-      severity: 'error',
-      value: row.duration
-    });
-  }
-  
-  // 价格验证
-  if (row.price && !validateNonNegative(row.price)) {
-    errors.push({
-      row: rowIndex,
-      column: 'price',
-      error: '价格必须是非负数',
-      severity: 'error',
-      value: row.price
-    });
-  }
-  
-  // 课程分类验证
-  const validCategories = ['技术培训', '管理培训', '销售培训', '其他'];
-  if (row.category && !validCategories.includes(row.category)) {
-    errors.push({
-      row: rowIndex,
-      column: 'category',
-      error: `课程分类必须是以下之一: ${validCategories.join(', ')}`,
-      severity: 'error',
-      value: row.category
-    });
-  }
-  
-  // 专家ID验证（如果提供）
-  if (row.expert_id) {
-    const expertExists = await checkExpertExists(row.expert_id);
-    if (!expertExists) {
-      errors.push({
-        row: rowIndex,
-        column: 'expert_id',
-        error: `专家ID ${row.expert_id} 不存在`,
-        severity: 'error',
-        value: row.expert_id
-      });
-    }
-  }
-  
-  return errors;
-}
-
 // 验证专家信息
 export async function validateExpert(
   row: any, 
@@ -658,23 +584,6 @@ export async function validateTrainingSession(row: any, rowIndex: number): Promi
     });
   }
   
-  if (!row.end_time) {
-    errors.push({
-      row: rowIndex,
-      column: 'end_time',
-      error: '结束时间为必填项',
-      severity: 'error'
-    });
-  } else if (!validateTime(row.end_time)) {
-    errors.push({
-      row: rowIndex,
-      column: 'end_time',
-      error: '结束时间格式不正确（应为 HH:MM）',
-      severity: 'error',
-      value: row.end_time
-    });
-  }
-  
   // 结束日期验证
   if (row.end_date) {
     if (!validateDate(row.end_date)) {
@@ -694,17 +603,6 @@ export async function validateTrainingSession(row: any, rowIndex: number): Promi
         value: row.end_date
       });
     }
-  }
-  
-  // 开始时间验证
-  if (row.start_time && !validateTime(row.start_time)) {
-    errors.push({
-      row: rowIndex,
-      column: 'start_time',
-      error: '开始时间格式不正确（应为 HH:MM）',
-      severity: 'error',
-      value: row.start_time
-    });
   }
   
   // 参训人数验证
@@ -902,9 +800,6 @@ export async function validateData(
     let errors: ValidationResult[] = [];
     
     switch (dataType) {
-      case 'courses':
-        errors = await validateCourse(row, rowIndex);
-        break;
       case 'experts':
         errors = await validateExpert(row, rowIndex, data);
         break;
@@ -938,9 +833,6 @@ export async function checkDuplicates(
     
     try {
       switch (dataType) {
-        case 'courses':
-          isDuplicate = await checkCourseDuplicate(row.id);
-          break;
         case 'experts':
           // 专家允许同名，不检查重复
           break;
@@ -964,17 +856,6 @@ export async function checkDuplicates(
   }
   
   return duplicateIndices;
-}
-
-// 检查课程重复
-async function checkCourseDuplicate(courseId: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('courses')
-    .select('id')
-    .eq('id', courseId)
-    .single();
-  
-  return !!data;
 }
 
 // 检查客户重复

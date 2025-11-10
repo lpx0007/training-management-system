@@ -27,10 +27,6 @@ export function useDataManagementPermissions() {
       import: 'salesperson_import',
       export: 'salesperson_export'
     },
-    courses: {
-      import: 'prospectus_import', // 课程暂时映射到简章权限
-      export: 'prospectus_export'
-    },
     salesperson_performance: {
       import: '', // 不支持导入
       export: 'performance_export' // 使用业绩数据导出权限
@@ -70,7 +66,7 @@ export function useDataManagementPermissions() {
 
   // 获取用户可以访问的数据类型列表
   const availableDataTypes = useMemo(() => {
-    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses', 'salesperson_performance', 'course_sales_performance'];
+    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'salesperson_performance', 'course_sales_performance'];
     return allDataTypes.filter(dataType => {
       // 向后兼容：管理员可以访问业绩数据
       if ((dataType === 'salesperson_performance' || dataType === 'course_sales_performance') && user?.role === 'admin') {
@@ -86,7 +82,7 @@ export function useDataManagementPermissions() {
 
   // 获取用户可以导入的数据类型列表
   const importableDataTypes = useMemo(() => {
-    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses', 'salesperson_performance', 'course_sales_performance'];
+    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'salesperson_performance', 'course_sales_performance'];
     return allDataTypes.filter(dataType => {
       const importPerm = permissionMap[dataType]?.import;
       return importPerm && permissions.includes(importPerm);
@@ -95,7 +91,7 @@ export function useDataManagementPermissions() {
 
   // 获取用户可以导出的数据类型列表
   const exportableDataTypes = useMemo(() => {
-    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'courses', 'salesperson_performance', 'course_sales_performance'];
+    const allDataTypes: DataType[] = ['customers', 'training_sessions', 'experts', 'salespersons', 'salesperson_performance', 'course_sales_performance'];
     return allDataTypes.filter(dataType => {
       // 向后兼容：管理员可以导出业绩数据
       if ((dataType === 'salesperson_performance' || dataType === 'course_sales_performance') && user?.role === 'admin') {
