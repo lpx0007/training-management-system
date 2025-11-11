@@ -7,7 +7,6 @@ import ExpertManagement from "@/pages/ExpertManagement";
 import SalesTracking from "@/pages/SalesTracking";
 import CustomerManagement from "@/pages/CustomerManagement";
 import DataExport from "@/pages/DataExport";
-import DataManagement from "@/pages/DataManagement";
 import SalesPersonManagement from "@/pages/SalesPersonManagement";
 import PermissionManagement from "@/pages/PermissionManagement";
 import ProfileSettings from "@/pages/ProfileSettings";
@@ -444,11 +443,6 @@ export default function App() {
         <Route path="/data-export" element={
           <ProtectedRoute requiredRole={['admin']}>
             <DataExport />
-          </ProtectedRoute>
-        } />
-        <Route path="/data-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager']}>
-            <DataManagement />
           </ProtectedRoute>
         } />
         <Route path="/salesperson-management" element={

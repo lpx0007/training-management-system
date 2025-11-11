@@ -2,6 +2,11 @@ import type { DataType, ColumnDefinition } from '@/types/dataManagement';
 
 // 数据类型配置
 export const DATA_TYPE_CONFIG = {
+  courses: {
+    label: '课程信息',
+    icon: 'BookOpen',
+    description: '批量导入或导出课程资料'
+  },
   experts: {
     label: '专家信息',
     icon: 'UserCheck',
@@ -117,8 +122,10 @@ export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
     id: '业务员ID',
     name: '业务员姓名',
     department: '部门',
-    completedCustomers: '成交次数',
+    completedSessions: '完成场次',
+    completedCustomers: '成交客户数',
     revenue: '销售额',
+    conversionRate: '转化率',
     latestDate: '最近成交日期',
     completedCustomerList: '成交客户列表'
   },

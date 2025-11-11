@@ -100,30 +100,13 @@ export const MENU_FEATURES: MenuFeature[] = [
     displayOrder: 9
   },
   {
-    id: 'data_management',
-    name: '数据管理',
-    path: '/data-management',
-    icon: 'database',
-    description: '批量导入导出数据',
-    requiredPermissions: [
-      'customer_import', 'customer_export',
-      'training_import', 'training_export',
-      'expert_import', 'expert_export',
-      'salesperson_import', 'salesperson_export',
-      'prospectus_import', 'prospectus_export',
-      'performance_export',
-      'data_download_template'
-    ], // 拥有任一导入导出权限即可访问
-    displayOrder: 10
-  },
-  {
     id: 'announcement_management',
     name: '公告管理',
     path: '/announcement-management',
     icon: 'bullhorn',
     description: '发布和管理系统公告',
     requiredPermissions: [], // 由路由层面的角色控制（仅管理员）
-    displayOrder: 11
+    displayOrder: 10
   },
   {
     id: 'permission_management',
@@ -132,7 +115,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'shield-alt',
     description: '管理用户权限',
     requiredPermissions: ['permission_manage'],
-    displayOrder: 12
+    displayOrder: 11
   },
   {
     id: 'audit_logs',
@@ -141,7 +124,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'history',
     description: '查看系统操作日志',
     requiredPermissions: ['audit_log_view'],
-    displayOrder: 13
+    displayOrder: 12
   },
   {
     id: 'profile_settings',
@@ -150,7 +133,7 @@ export const MENU_FEATURES: MenuFeature[] = [
     icon: 'cog',
     description: '管理个人资料和偏好',
     requiredPermissions: [], // 所有角色都可访问
-    displayOrder: 14
+    displayOrder: 13
   }
 ];
 
@@ -192,7 +175,6 @@ export const ROLE_DEFAULT_MENU_FEATURES: Record<UserRole, string[]> = {
     'training_management',
     'course_management',
     'salesperson_management',
-    'data_management',
     'profile_settings',
   ]
 };

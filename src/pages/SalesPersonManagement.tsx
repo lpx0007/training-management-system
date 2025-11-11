@@ -17,11 +17,15 @@ import {
   Briefcase,
   UserPlus,
   UserCheck,
-  DollarSign
+  DollarSign,
+  Upload,
+  Download
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import { toast } from 'sonner';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/Notifications/NotificationBell';
+import SalesPersonImportModal from '@/components/SalesPersonImportModal';
 import supabaseService from '@/lib/supabase/supabaseService';
 import type { Salesperson as BaseSalesperson } from '@/lib/supabase/types';
 
@@ -316,6 +320,68 @@ export default function SalesPersonManagement() {
     }
   };
 
+  // 处理导入业务员
+  const handleImportSalespersons = async (data: any[]) => {
+    try {
+      const dataManagementService = (await import('@/lib/services/dataManagementService')).default;
+      
+      const toastId = toast.loading('正在导入业务员...');
+      
+      const result = await dataManagementService.importData('salespersons', data, 'skip');
+      
+      toast.dismiss(toastId);
+      
+      if (result.success > 0) {
+        toast.success(`成功导入 ${result.success} 位业务员`);
+        loadSalespersons(); // 刷新列表
+      }
+      if (result.failed > 0) {
+        toast.error(`${result.failed} 位业务员导入失败`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || '导入失败');
+    }
+  };
+
+  // 处理导出业务员
+  const handleExportSalespersons = async () => {
+    const toastId = toast.loading('正在导出...');
+    
+    try {
+      // 只导出业务员角色的用户
+      const salespersonData = filteredSalespersons.filter(
+        (person) => person.role === 'salesperson' || !person.role // 兼容旧数据
+      );
+      
+      // 格式化导出数据
+      const exportData = salespersonData.map(person => ({
+        姓名: person.name,
+        职位: person.position || '销售顾问',
+        部门: person.department || '',
+        手机号: person.phone || '',
+        邮箱: person.email || '',
+        团队: person.team || '',
+        入职日期: person.join_date || '',
+        状态: person.status === 'enabled' ? '在职' : '离职',
+        工作状态: person.work_status === 'trial' ? '试用期' : 
+                   person.work_status === 'resigned' ? '离职' : '正式'
+      }));
+      
+      // 导出文件
+      const XLSX = await import('xlsx');
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '业务员信息');
+      XLSX.writeFile(wb, `业务员信息_${new Date().toLocaleDateString('zh-CN')}.xlsx`);
+      
+      toast.dismiss(toastId);
+      toast.success(`成功导出 ${exportData.length} 条业务员数据`);
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      toast.error(error.message || '导出失败');
+    }
+  };
+
   // 打开添加业务员模态框
   const openAddModal = () => {
     setIsAddModalOpen(true);
@@ -323,6 +389,7 @@ export default function SalesPersonManagement() {
 
   // 编辑业务员信息
   const [isEditSalespersonModalOpen, setIsEditSalespersonModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
   const handleEditSalesperson = (salesperson: Salesperson) => {
     setSelectedSalesperson(salesperson);
@@ -531,18 +598,41 @@ export default function SalesPersonManagement() {
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">业务员管理</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative">
-                <i className="fas fa-bell"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationBell />
+              
+              {/* 导入业务员 */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsImportModalOpen(true)}
+                className="px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm flex items-center"
+                title="批量导入业务员"
+              >
+                <Upload size={16} className="sm:mr-2" />
+                <span className="hidden sm:inline">导入</span>
+              </motion.button>
+              
+              {/* 导出业务员 */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleExportSalespersons}
+                className="px-2 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-sm flex items-center"
+                title="导出业务员数据"
+              >
+                <Download size={16} className="sm:mr-2" />
+                <span className="hidden sm:inline">导出</span>
+              </motion.button>
+              
+              {/* 添加业务员 */}
               <motion.button 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={openAddModal}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
+                className="px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center text-sm sm:text-base"
               >
-                <Plus size={16} className="mr-2" />
-                添加业务员
+                <Plus size={16} className="sm:mr-2" />
+                <span className="ml-1 sm:ml-0">添加<span className="hidden sm:inline">业务员</span></span>
               </motion.button>
             </div>
           </div>
@@ -1863,6 +1953,13 @@ export default function SalesPersonManagement() {
           </motion.div>
         </motion.div>
       )}
+
+      {/* 导入业务员模态框 */}
+      <SalesPersonImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportSalespersons}
+      />
     </div>
   );
 }

@@ -16,14 +16,17 @@ import {
   MapPin,
   Calendar,
   Briefcase,
-  GraduationCap,
   Check,
-  X
+  X,
+  Upload,
+  Download
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { toast } from 'sonner';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/Notifications/NotificationBell';
+import ExpertImportModal from '@/components/ExpertImportModal';
 import supabaseService from '@/lib/supabase/supabaseService';
 import type { Expert } from '@/lib/supabase/types';
 import { generateDefaultAvatar } from '@/utils/imageUtils';
@@ -152,6 +155,7 @@ export default function ExpertManagement() {
 
   // 打开编辑专家模态框
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editExpert, setEditExpert] = useState<Expert | null>(null);
   const [formData, setFormData] = useState<Partial<Expert>>({
@@ -210,6 +214,64 @@ export default function ExpertManagement() {
     }
   };
 
+  // 处理导入专家
+  const handleImportExperts = async (data: any[]) => {
+    try {
+      const dataManagementService = (await import('@/lib/services/dataManagementService')).default;
+      
+      const toastId = toast.loading('正在导入专家...');
+      
+      const result = await dataManagementService.importData('experts', data, 'skip');
+      
+      toast.dismiss(toastId);
+      
+      if (result.success > 0) {
+        toast.success(`成功导入 ${result.success} 位专家`);
+        loadExperts(); // 刷新列表
+      }
+      if (result.failed > 0) {
+        toast.error(`${result.failed} 位专家导入失败`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || '导入失败');
+    }
+  };
+
+  // 处理导出专家
+  const handleExportExperts = async () => {
+    const toastId = toast.loading('正在导出...');
+    
+    try {
+      // 格式化导出数据
+      const exportData = filteredExperts.map(expert => ({
+        姓名: expert.name,
+        手机号: expert.phone || '',
+        专业领域: expert.field || '',
+        职称: expert.title || '',
+        地区: expert.location || '',
+        简介: expert.bio || '',
+        经验: expert.experience || '',
+        评分: expert.rating || 0,
+        往期场次: expert.past_sessions || 0,
+        总参与人数: expert.total_participants || 0,
+        是否可用: expert.available ? '可预约' : '不可约'
+      }));
+      
+      // 导出文件
+      const XLSX = await import('xlsx');
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '专家信息');
+      XLSX.writeFile(wb, `专家信息_${new Date().toLocaleDateString('zh-CN')}.xlsx`);
+      
+      toast.dismiss(toastId);
+      toast.success(`成功导出 ${exportData.length} 条专家数据`);
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      toast.error(error.message || '导出失败');
+    }
+  };
+
   // 添加专家
   const addExpert = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,22 +294,21 @@ export default function ExpertManagement() {
       const sessions = await supabaseService.getTrainingSessions();
       const relatedSessions = sessions.filter(s => s.expertId === id);
       
-      // 2. 查询关联的课程数量
-      const courses = await supabaseService.getCourses();
-      const relatedCourses = courses.filter(c => c.expert_id === id);
+      // 2. 查询关联的课程数量（暂时设为0，后续完善）
+      const relatedCourses: any[] = [];
       
       // 3. 构建确认消息
       const expert = experts.find(e => e.id === id);
       let message = `确定要删除专家「${expert?.name}」吗？\n\n`;
       
-      if (relatedSessions.length > 0 || relatedCourses.length > 0) {
+      if (relatedSessions.length > 0) {
         message += `该专家有以下关联数据：\n`;
         if (relatedSessions.length > 0) {
           message += `• ${relatedSessions.length} 个培训场次\n`;
         }
-        if (relatedCourses.length > 0) {
-          message += `• ${relatedCourses.length} 个课程\n`;
-        }
+        // if (relatedCourses.length > 0) {
+        //   message += `• ${relatedCourses.length} 个课程\n`;
+        // }
         message += `\n删除后，这些记录的专家将被清空。\n`;
         message += `建议先重新分配培训场次和课程。\n\n`;
         message += `仍要继续删除吗？`;
@@ -259,7 +320,12 @@ export default function ExpertManagement() {
       // 5. 执行删除
       await supabaseService.deleteExpert(id);
       
-      // 6. 显示删除结果
+      // 6. 清空关联数据的专家引用（暂时跳过，后续处理）
+      // if (relatedSessions.length > 0) {
+      //   await supabaseService.clearExpertFromSessions(id, relatedSessions, []);
+      // }
+      
+      // 7. 显示删除结果
       if (relatedSessions.length > 0 || relatedCourses.length > 0) {
         toast.success(
           `专家已删除。${relatedSessions.length} 个培训场次和 ${relatedCourses.length} 个课程的专家已清空。`,
@@ -330,19 +396,46 @@ export default function ExpertManagement() {
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">专家资源管理</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative">
-                <i className="fas fa-bell"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationBell />
+              
+              {/* 导入专家 */}
+              <PermissionGuard permission="expert_import">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm flex items-center"
+                  title="批量导入专家"
+                >
+                  <Upload size={16} className="sm:mr-2" />
+                  <span className="hidden sm:inline">导入</span>
+                </motion.button>
+              </PermissionGuard>
+              
+              {/* 导出专家 */}
+              <PermissionGuard permission="expert_export">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleExportExperts()}
+                  className="px-2 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-sm flex items-center"
+                  title="导出专家数据"
+                >
+                  <Download size={16} className="sm:mr-2" />
+                  <span className="hidden sm:inline">导出</span>
+                </motion.button>
+              </PermissionGuard>
+              
+              {/* 添加专家 */}
               <PermissionGuard permission="expert_add">
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={openAddModal}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
+                  className="px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center text-sm sm:text-base"
                 >
-                  <Plus size={16} className="mr-2" />
-                  添加专家
+                  <Plus size={16} className="sm:mr-2" />
+                  <span className="ml-1 sm:ml-0">添加<span className="hidden sm:inline">专家</span></span>
                 </motion.button>
               </PermissionGuard>
             </div>
@@ -1291,6 +1384,13 @@ export default function ExpertManagement() {
           </motion.div>
         </motion.div>
       )}
+
+      {/* 导入专家模态框 */}
+      <ExpertImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportExperts}
+      />
     </div>
   );
 }

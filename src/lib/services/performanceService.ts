@@ -12,6 +12,11 @@ export async function getMonthlyPerformance(
     let startDateStr: string, endDateStr: string;
     
     switch (timeRange) {
+      case '全部':
+        // 获取所有数据，不设置日期限制
+        startDateStr = '2000-01-01'; // 设置一个很早的日期
+        endDateStr = '2099-12-31';   // 设置一个很晚的日期
+        break;
       case '本月':
         startDateStr = '2025-11-01';
         endDateStr = '2025-11-30';
@@ -25,8 +30,17 @@ export async function getMonthlyPerformance(
         endDateStr = '2025-12-31';
         break;
       case '本年':
+      case '本年度':  // 支持两种写法
         startDateStr = '2025-01-01';
         endDateStr = '2025-12-31';
+        break;
+      case '上季度':
+        startDateStr = '2025-07-01';
+        endDateStr = '2025-09-30';
+        break;
+      case '去年':
+        startDateStr = '2024-01-01';
+        endDateStr = '2024-12-31';
         break;
       default:
         startDateStr = '2025-11-01';
@@ -64,7 +78,7 @@ export async function getMonthlyPerformance(
     if (sessionIds.length > 0) {
       const { data: sessions } = await supabase
         .from('training_sessions')
-        .select('id, name, training_mode, online_price, offline_price')
+        .select('id, name, date, end_date, training_mode, online_price, offline_price')
         .in('id', sessionIds);
       
       sessions?.forEach((s: any) => {
@@ -188,7 +202,7 @@ export async function getMonthlyPerformance(
       // 从participant获取实收价格（使用actual_price，优惠后的价格，与培训计划详情页一致）
       const revenue = Number(participant.actual_price || participant.payment_amount) || 0;
       
-      console.log(`✅ 处理参与者 [${participant.name}]:`, {
+      console.log(`✅ 处理参与者 [${participant.name || '未知'}]:`, {
         payment_amount: participant.payment_amount,
         actual_price: participant.actual_price,
         计算金额: revenue,
@@ -204,13 +218,27 @@ export async function getMonthlyPerformance(
       person.revenue += revenue;
       
       // 添加客户到列表（包含客户信息和参训信息）
+      // 格式化日期
+      const formatDateRange = (startDate: string, endDate: string) => {
+        const start = new Date(startDate).toLocaleDateString('zh-CN');
+        const end = new Date(endDate).toLocaleDateString('zh-CN');
+        return `${start} - ${end}`;
+      };
+      
+      const courseNameWithDate = sessionData 
+        ? `${sessionData.name}（${formatDateRange(sessionData.date, sessionData.end_date)}）`
+        : '未知课程';
+      
       person.customerList.push({
         id: participant.id,
-        name: participant.name,
-        phone: participant.phone,
-        company: participant.company || '',
+        name: participant.name || '',
+        phone: participant.phone || '',
+        company: '', // training_participants表中没有company字段
         latestDate: participant.registration_date,
-        courseName: sessionData?.name || '未知课程',
+        courseName: courseNameWithDate,  // 包含时间的课程名称
+        courseNameOnly: sessionData?.name || '未知课程',  // 仅课程名称
+        sessionDate: sessionData?.date,
+        sessionEndDate: sessionData?.end_date,
         amount: revenue
       });
       
@@ -333,34 +361,49 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
     
     // 计算时间范围（用于后续统计）
     if (timeRange !== '全部') {
-      const now = new Date();
-      let startDate: Date, endDate: Date;
-      
-      switch (timeRange) {
-        case '本月':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-          break;
-        case '上月':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-          break;
-        case '本季度':
-          const currentQuarter = Math.floor(now.getMonth() / 3);
-          startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
-          endDate = new Date(now.getFullYear(), currentQuarter * 3 + 3, 0);
-          break;
-        case '本年':
-          startDate = new Date(now.getFullYear(), 0, 1);
-          endDate = new Date(now.getFullYear(), 11, 31);
-          break;
-        default:
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      }
+      // 检查是否是年月格式 (YYYY-MM) 或仅年份 (YYYY)
+      if (timeRange.match(/^\d{4}-\d{2}$/)) {
+        // 年月格式: YYYY-MM
+        const [year, month] = timeRange.split('-').map(Number);
+        startDateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
+      } else if (timeRange.match(/^\d{4}$/)) {
+        // 仅年份: YYYY
+        const year = parseInt(timeRange);
+        startDateStr = `${year}-01-01`;
+        endDateStr = `${year}-12-31`;
+      } else {
+        // 原有的时间范围处理
+        const now = new Date();
+        let startDate: Date, endDate: Date;
+        
+        switch (timeRange) {
+          case '本月':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            break;
+          case '上月':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+            break;
+          case '本季度':
+            const currentQuarter = Math.floor(now.getMonth() / 3);
+            startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+            endDate = new Date(now.getFullYear(), currentQuarter * 3 + 3, 0);
+            break;
+          case '本年':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            endDate = new Date(now.getFullYear(), 11, 31);
+            break;
+          default:
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
 
-      startDateStr = startDate.toISOString().split('T')[0];
-      endDateStr = endDate.toISOString().split('T')[0];
+        startDateStr = startDate.toISOString().split('T')[0];
+        endDateStr = endDate.toISOString().split('T')[0];
+      }
       
       console.log('📅 查询日期范围:', `从 ${startDateStr} 到 ${endDateStr}`);
     } else {
@@ -422,6 +465,9 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
       .select(`
         id,
         training_session_id,
+        name,
+        phone,
+        email,
         salesperson_name,
         participation_mode,
         actual_price,
@@ -493,9 +539,30 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
         percentage: totalRevenue > 0 ? ((sp.revenue / totalRevenue) * 100).toFixed(1) : '0'
       }));
 
+      // 格式化日期字符串
+      const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('zh-CN');
+      };
+      
+      // 构建课程名称（包含时间）
+      const courseNameWithDate = `${session.name}（${formatDate(session.date)} - ${formatDate(session.end_date)}）`;
+      
+      // 准备参训人员详细信息（用于导出）
+      const participantsList = rangeParticipants.map((p: any) => ({
+        customerName: p.name || '',
+        customerPhone: p.phone || '',
+        customerCompany: '', // training_participants表中没有company字段
+        salespersonName: p.salesperson_name || '',
+        participationMode: p.participation_mode === 'online' ? '线上' : '线下',
+        actualPrice: Number(p.actual_price || p.payment_amount) || 0,
+        registrationDate: p.registration_date
+      }));
+      
       return {
         id: session.id,
-        courseName: session.name,
+        courseName: courseNameWithDate,  // 导出时课程名称包含时间
+        courseNameOnly: session.name,    // 仅课程名称（用于页面显示）
         sessionDate: session.date,
         endDate: session.end_date,
         area: session.area || '-',
@@ -507,12 +574,17 @@ export async function getCoursePerformanceDetail(courseFilter: string = '全部'
         totalParticipants: rangeParticipants.length,
         revenue: totalRevenue,
         status: new Date(session.date) < new Date() ? '已完成' : '进行中',
-        salespersonList // 业务员明细列表
+        salespersonList, // 业务员明细列表
+        participantsList // 参训人员明细列表（用于导出）
       };
     });
 
+    // 注释掉过滤，显示所有课程（包括0参训人员的）
+    // const detailsWithParticipants = courseDetails.filter((course: any) => course.totalParticipants > 0);
+    const detailsWithParticipants = courseDetails; // 显示所有课程
+    
     // 按培训日期降序排序
-    const sortedDetails = courseDetails.sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+    const sortedDetails = detailsWithParticipants.sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
     
     console.log('🎉 [最终返回] 课程销售明细数量:', sortedDetails.length);
     console.log('📊 [课程明细汇总]:', sortedDetails.map((d: any) => ({

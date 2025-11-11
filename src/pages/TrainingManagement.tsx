@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '@/contexts/authContext';
-import { Plus, Search, Calendar, MapPin, Users, DollarSign, Eye, Edit, UserPlus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Calendar, MapPin, Users, DollarSign, Eye, Edit, UserPlus, Trash2, ChevronLeft, ChevronRight, Upload, Download } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import TrainingSessionFormModal from '@/components/TrainingSessionFormModal';
 import ParticipantFormModal from '@/components/ParticipantFormModal';
@@ -69,6 +69,82 @@ export default function TrainingManagement() {
       toast.error('加载数据失败');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 处理导入培训场次
+  const handleImportSessions = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls,.csv';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        try {
+          const { parseFile } = await import('@/lib/parsers/fileParser');
+          const { validateData } = await import('@/lib/validators/dataValidator');
+          const dataManagementService = (await import('@/lib/services/dataManagementService')).default;
+          
+          toast.loading('正在解析文件...');
+          const data = await parseFile(file, 'training_sessions');
+          
+          const validation = await validateData(data, 'training_sessions');
+          if (validation.length > 0 && validation[0].error) {
+            toast.error(`验证失败: ${validation[0].error}`);
+            return;
+          }
+          
+          const result = await dataManagementService.importData('training_sessions', data, 'skip');
+          
+          if (result.success > 0) {
+            toast.success(`成功导入 ${result.success} 个培训场次`);
+            loadData(); // 刷新列表
+          }
+          if (result.failed > 0) {
+            toast.error(`${result.failed} 个培训场次导入失败`);
+          }
+        } catch (error: any) {
+          toast.error(error.message || '导入失败');
+        }
+      }
+    };
+    input.click();
+  };
+
+  // 处理导出培训场次
+  const handleExportSessions = async () => {
+    try {
+      const dataManagementService = (await import('@/lib/services/dataManagementService')).default;
+      
+      toast.loading('正在导出...');
+      
+      // 导出配置
+      const config = {
+        dataType: 'training_sessions' as const,
+        format: 'excel' as const,
+        range: 'all' as const,
+        selectedFields: ['course_name', 'session_number', 'name', 'date', 'end_date', 'location', 'area', 'instructor', 'expert', 'salesperson_name', 'capacity', 'participants', 'status'],
+        filters: {}
+      };
+      
+      // 获取数据
+      const data = await dataManagementService.exportData(config, user?.id, user?.role, []);
+      
+      // 导出文件
+      const { exportToExcel } = await import('@/lib/exporters/fileExporter');
+      const blob = exportToExcel(data, config);
+      
+      // 下载文件
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `培训计划_${new Date().toLocaleDateString('zh-CN')}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success('导出成功');
+    } catch (error: any) {
+      toast.error(error.message || '导出失败');
     }
   };
 
@@ -277,15 +353,38 @@ export default function TrainingManagement() {
                     管理培训场次和参与者
                   </p>
                 </div>
-                {user?.role === 'admin' && (
+                <div className="flex items-center gap-3">
+                  {/* 导入培训 */}
                   <button
-                    onClick={handleAddSession}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                    onClick={handleImportSessions}
+                    className="px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
+                    title="批量导入培训计划"
                   >
-                    <Plus size={20} />
-                    添加培训
+                    <Upload size={20} />
+                    <span className="hidden sm:inline">导入</span>
                   </button>
-                )}
+                  
+                  {/* 导出培训 */}
+                  <button
+                    onClick={handleExportSessions}
+                    className="px-2 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-1 sm:gap-2"
+                    title="导出培训数据"
+                  >
+                    <Download size={20} />
+                    <span className="hidden sm:inline">导出</span>
+                  </button>
+                  
+                  {/* 添加培训 */}
+                  {user?.role === 'admin' && (
+                    <button
+                      onClick={handleAddSession}
+                      className="px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
+                    >
+                      <Plus size={20} />
+                      <span className="ml-1 sm:ml-0">添加<span className="hidden sm:inline">培训</span></span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

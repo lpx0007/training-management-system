@@ -1,14 +1,17 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '@/contexts/authContext';
-import { Plus, Search, Download, Upload, BookOpen, Grid3X3, List, CheckSquare } from 'lucide-react';
+import { Plus, Search, Download, Upload, Grid3X3, List, CheckSquare, Menu, BookOpen } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/Notifications/NotificationBell';
 import { CourseCard } from '@/components/CourseCard';
 import { CourseTable } from '@/components/CourseTable';
 import { CourseMergedView } from '@/components/CourseMergedView';
 import CourseFormModal from '@/components/CourseFormModal';
+import CourseImportModal from '@/components/CourseImportModal';
 import TrainingSessionFormModal from '@/components/TrainingSessionFormModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import courseService from '@/lib/services/courseService';
 import trainingSessionService from '@/lib/services/trainingSessionService';
 import type { CourseWithSessions, CourseDB, TrainingSession } from '@/lib/supabase/types';
@@ -39,6 +42,7 @@ export default function CourseManagement() {
   const [enableBatchSelect, setEnableBatchSelect] = useState(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedCourseForSession, setSelectedCourseForSession] = useState<CourseWithSessions | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // 初始化数据
   useEffect(() => {
@@ -314,38 +318,152 @@ export default function CourseManagement() {
     }
   };
 
+  const filteredCourses = getFilteredCourses();
+
+  // 导出课程
+  const handleExportCourses = () => {
+    const exportData = filteredCourses.map(course => ({
+      '课程代码': course.code || '',
+      '课程名称': course.name,
+      '模块分类': course.module || '',
+      '培训天数': course.durationDays || 0,
+      '培训期数(每年)': course.sessionsPerYear || 0,
+      '课程状态': course.status === 'active' ? '启用' : '停用',
+      '课程描述': course.description || '',
+      '已开设场次': course.actualSessionCount || 0,
+      '项目负责人': course.projectManagerName || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '课程列表');
+    XLSX.writeFile(wb, `课程列表_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success(`导出成功，共${exportData.length}条数据`);
+  };
+
+  // 导入课程
+  const handleImportCourses = async (courses: any[]) => {
+    try {
+      // 逐个创建课程
+      let successCount = 0;
+      for (const course of courses) {
+        try {
+          await courseService.createCourse(course);
+          successCount++;
+        } catch (error) {
+          console.error(`导入课程失败: ${course.name}`, error);
+        }
+      }
+      
+      if (successCount > 0) {
+        toast.success(`成功导入${successCount}个课程`);
+        await loadData();
+      }
+      
+      if (successCount < courses.length) {
+        toast.warning(`${courses.length - successCount}个课程导入失败`);
+      }
+    } catch (error) {
+      console.error('导入课程失败:', error);
+      throw error;
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      {/* 移动端遮罩层 */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-0 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="p-8">
-            {/* 页面头部 */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
-                <BookOpen className="mr-3" />
-                课程管理
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
-                管理培训课程信息，查看课程安排和培训记录
-              </p>
+          {/* 页面头部 */}
+          <div className="bg-white dark:bg-gray-800 px-6 py-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {/* 移动端菜单按钮 */}
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden text-gray-600 dark:text-gray-300"
+                >
+                  <Menu size={20} />
+                </button>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  课程管理
+                </h1>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* 通知提醒 */}
+                <NotificationBell />
+                {/* 添加课程按钮 */}
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Plus size={18} />
+                    <span>添加课程</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 lg:p-6">
+            {/* 统计信息 */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm">
+                <div className="text-xs text-gray-500 dark:text-gray-400">总模块数</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                  {modules.length}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm">
+                <div className="text-xs text-gray-500 dark:text-gray-400">总课程数</div>
+                <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                  {coursesWithSessions.length}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm">
+                <div className="text-xs text-gray-500 dark:text-gray-400">总期数</div>
+                <div className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">
+                  {coursesWithSessions.reduce((sum, course) => {
+                    // 每个课程的期数相加
+                    return sum + (course.sessionsPerYear || 0);
+                  }, 0)}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm">
+                <div className="text-xs text-gray-500 dark:text-gray-400">总天数</div>
+                <div className="text-xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+                  {coursesWithSessions.reduce((sum, course) => {
+                    // 每个课程的（期数 × 天数）相加
+                    return sum + ((course.sessionsPerYear || 0) * (course.durationDays || 0));
+                  }, 0)}
+                </div>
+              </div>
             </div>
 
             {/* 工具栏 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
-              <div className="flex flex-col lg:flex-row gap-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 mb-4">
+              <div className="flex flex-col lg:flex-row gap-3">
                 {/* 左侧：搜索和筛选 */}
-                <div className="flex-1 flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 flex flex-col sm:flex-row gap-3">
                   {/* 搜索框 */}
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="text"
-                      placeholder="搜索课程名称、编号或描述..."
+                      placeholder="搜索课程..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   
@@ -354,7 +472,7 @@ export default function CourseManagement() {
                     <select
                       value={selectedModule}
                       onChange={(e) => setSelectedModule(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="全部">所有模块</option>
                       {modules.map(module => (
@@ -365,7 +483,7 @@ export default function CourseManagement() {
                     <select
                       value={selectedStatus}
                       onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="全部">所有状态</option>
                       <option value="active">进行中</option>
@@ -376,7 +494,7 @@ export default function CourseManagement() {
                     <select
                       value={selectedManager}
                       onChange={(e) => setSelectedManager(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="全部">所有负责人</option>
                       {managers.map(manager => (
@@ -387,41 +505,41 @@ export default function CourseManagement() {
                 </div>
 
                 {/* 右侧：视图切换和操作按钮 */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {/* 视图切换 */}
                   <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                     <button
                       onClick={() => handleViewModeChange('card')}
-                      className={`px-3 py-1.5 rounded-md transition-colors ${
+                      className={`px-3 py-2 rounded-md transition-colors ${
                         viewMode === 'card'
                           ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title="卡片视图"
                     >
-                      <Grid3X3 size={18} />
+                      <Grid3X3 size={20} />
                     </button>
                     <button
                       onClick={() => handleViewModeChange('list')}
-                      className={`px-3 py-1.5 rounded-md transition-colors ${
+                      className={`px-3 py-2 rounded-md transition-colors ${
                         viewMode === 'list'
                           ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title="列表视图"
                     >
-                      <List size={18} />
+                      <List size={20} />
                     </button>
                     <button
                       onClick={() => handleViewModeChange('merged')}
-                      className={`px-3 py-1.5 rounded-md transition-colors ${
+                      className={`px-3 py-2 rounded-md transition-colors ${
                         viewMode === 'merged'
                           ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                           : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title="合并视图"
                     >
-                      <BookOpen size={18} />
+                      <BookOpen size={20} />
                     </button>
                   </div>
 
@@ -432,36 +550,33 @@ export default function CourseManagement() {
                         setEnableBatchSelect(!enableBatchSelect);
                         setSelectedCourseIds([]);
                       }}
-                      className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                      className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
                         enableBatchSelect
                           ? 'bg-blue-600 hover:bg-blue-700 text-white'
                           : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
                       }`}
                     >
-                      <CheckSquare size={18} />
-                      {enableBatchSelect ? '取消批量' : '批量操作'}
+                      <CheckSquare size={20} />
+                      <span className="hidden sm:inline">{enableBatchSelect ? '取消' : '批量'}</span>
                     </button>
                   )}
                   {user?.role === 'admin' && (
                     <>
                       <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm flex items-center"
+                        title="批量导入课程"
                       >
-                        <Plus size={18} />
-                        添加课程
+                        <Upload size={16} className="sm:mr-2" />
+                        <span className="hidden sm:inline">导入</span>
                       </button>
                       <button
-                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2 text-gray-700 dark:text-gray-300"
-                        title="导入课程"
-                      >
-                        <Upload size={18} />
-                      </button>
-                      <button
-                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                        onClick={handleExportCourses}
+                        className="px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
                         title="导出课程"
                       >
-                        <Download size={18} />
+                        <Download size={16} className="sm:mr-2" />
+                        <span className="hidden sm:inline">导出</span>
                       </button>
                     </>
                   )}
@@ -471,7 +586,7 @@ export default function CourseManagement() {
 
             {/* 批量操作工具栏 */}
             {enableBatchSelect && selectedCourseIds.length > 0 && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckSquare size={20} className="text-blue-600" />
@@ -518,40 +633,6 @@ export default function CourseManagement() {
                 </div>
               </div>
             )}
-
-            {/* 统计信息 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">总模块数</div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {modules.length}
-                </div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">总课程数</div>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {coursesWithSessions.length}
-                </div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">总期数</div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {coursesWithSessions.reduce((sum, course) => {
-                    // 每个课程的期数相加
-                    return sum + (course.sessionsPerYear || 0);
-                  }, 0)}
-                </div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">总天数</div>
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {coursesWithSessions.reduce((sum, course) => {
-                    // 每个课程的（期数 × 天数）相加
-                    return sum + ((course.sessionsPerYear || 0) * (course.durationDays || 0));
-                  }, 0)}
-                </div>
-              </div>
-            </div>
 
             {/* 内容区域 - 根据视图模式显示不同内容 */}
             {isLoading ? (
@@ -612,6 +693,13 @@ export default function CourseManagement() {
           </div>
         </main>
       </div>
+
+      {/* 导入课程模态框 */}
+      <CourseImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportCourses}
+      />
 
       {/* 添加课程模态框 */}
       <CourseFormModal

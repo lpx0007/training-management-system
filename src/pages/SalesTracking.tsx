@@ -16,9 +16,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
-import { 
-  getSalesPersonsData,
-  getMonthlySalesData,
+import NotificationBell from '@/components/Notifications/NotificationBell';
+import {
   type SalesPersonData,
   type MonthlySalesData
 } from '@/lib/services/salesTrackingService';
@@ -28,6 +27,13 @@ import {
   getTopPerformers,
   calculateGrowthRate
 } from '@/lib/services/performanceService';
+import {
+  getAllSalespersons
+} from '@/lib/services/salespersonService';
+import {
+  getTrainingCoursesByTimeRange,
+  getAvailableYears
+} from '@/lib/services/trainingCourseService';
 
 export default function SalesTracking() {
   const { user } = useContext(AuthContext);
@@ -35,25 +41,84 @@ export default function SalesTracking() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm] = useState(''); // 未使用的搜索功能，保留以避免useEffect报错
   const [selectedDepartment] = useState('全部'); // 未使用的筛选功能，保留以避免useEffect报错
-  const [selectedTimeRange, setSelectedTimeRange] = useState('全部');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('本月');
   const [selectedCourse] = useState('全部'); // 未使用的课程筛选，保留以避免useEffect报错
   const [activeTab, setActiveTab] = useState<'ranking' | 'detail'>('ranking'); // Tab切换
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set()); // 展开的课程
   const [expandedDetailCourses, setExpandedDetailCourses] = useState<Set<string>>(new Set()); // 详情框中展开的课程
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'revenue', direction: 'desc' });
   const [selectedSalesperson, setSelectedSalesperson] = useState<SalesPersonData | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportType, setExportType] = useState<'salesperson' | 'course'>('salesperson');
+  // 业务员业绩筛选
+  const [performanceFilters, setPerformanceFilters] = useState({
+    timeRange: '本月',
+    department: '全部',
+    salesperson: '全部'
+  });
+  // 课程销售业绩筛选
+  const [courseSalesFilters, setCourseSalesFilters] = useState({
+    course: '全部',
+    year: new Date().getFullYear().toString(),
+    month: (new Date().getMonth() + 1).toString()
+  });
+  // 可用的年份列表
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  // 根据时间筛选的课程列表
+  const [filteredCoursesForExport, setFilteredCoursesForExport] = useState<any[]>([]);
   // 真实数据状态
   const [salesData, setSalesData] = useState<SalesPersonData[]>([]);
   const [filteredSalesData, setFilteredSalesData] = useState<SalesPersonData[]>([]);
   const [monthlySalesData, setMonthlySalesData] = useState<MonthlySalesData[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // 筛选后的业务员列表（用于导出模态框联动）
+  const [filteredSalespersonsForExport, setFilteredSalespersonsForExport] = useState<SalesPersonData[]>([]);
+  
   // 真实业绩数据
   const [realPerformanceData, setRealPerformanceData] = useState<any>(null);
   const [courseDetails, setCourseDetails] = useState<any[]>([]);
   const [topPerformers, setTopPerformers] = useState<any>(null);
   const [growthRate, setGrowthRate] = useState(0);
+  
+  // 当部门筛选改变时，更新业务员列表
+  useEffect(() => {
+    if (performanceFilters.department === '全部') {
+      setFilteredSalespersonsForExport(salesData);
+    } else {
+      const filtered = salesData.filter(sp => sp.department === performanceFilters.department);
+      setFilteredSalespersonsForExport(filtered);
+    }
+    // 如果当前选中的业务员不在新的部门中，重置为全部
+    if (performanceFilters.salesperson !== '全部') {
+      const currentSalesperson = salesData.find(sp => sp.name === performanceFilters.salesperson);
+      if (currentSalesperson && currentSalesperson.department !== performanceFilters.department && performanceFilters.department !== '全部') {
+        setPerformanceFilters(prev => ({ ...prev, salesperson: '全部' }));
+      }
+    }
+  }, [performanceFilters.department, salesData]);
+
+  // 加载可用年份列表
+  useEffect(() => {
+    async function loadYears() {
+      const years = await getAvailableYears();
+      setAvailableYears(years);
+    }
+    loadYears();
+  }, []);
+
+  // 根据年月加载课程列表
+  useEffect(() => {
+    async function loadFilteredCourses() {
+      const courses = await getTrainingCoursesByTimeRange(
+        courseSalesFilters.year,
+        courseSalesFilters.month
+      );
+      setFilteredCoursesForExport(courses);
+    }
+    loadFilteredCourses();
+  }, [courseSalesFilters.year, courseSalesFilters.month]);
 
   // 加载数据
   useEffect(() => {
@@ -63,12 +128,14 @@ export default function SalesTracking() {
         console.log('开始加载销售追踪数据...');
         
         // 加载真实业绩数据 - 不传递用户筛选参数，获取所有数据
-        const [performanceData, topPerf, lastMonthData, currentMonthData, courseDetailData] = await Promise.all([
+        const [performanceData, topPerf, lastMonthData, currentMonthData, courseDetailData, allSalespersons] = await Promise.all([
           getMonthlyPerformance(selectedTimeRange), // 不传递 user?.id 和 user?.department
           getTopPerformers(selectedTimeRange, user?.role, user?.department),
           getMonthlyPerformance('上月'),
           getMonthlyPerformance('本月'),
-          getCoursePerformanceDetail(selectedCourse, selectedTimeRange)
+          getCoursePerformanceDetail(selectedCourse, selectedTimeRange),
+          // 获取所有业务员（用于导出筛选）
+          getAllSalespersons()
         ]);
         
         // 计算环比增长
@@ -89,20 +156,53 @@ export default function SalesTracking() {
         console.log('🔍 salesPersonData长度:', performanceData?.salesPersonData?.length);
         console.log('🔍 salesPersonData内容:', performanceData?.salesPersonData);
         
+        // 合并真实业绩数据和所有业务员列表
         if (performanceData && performanceData.salesPersonData && performanceData.salesPersonData.length > 0) {
           console.log('✅ 使用真实数据，设置salesData:', performanceData.salesPersonData);
-          setSalesData(performanceData.salesPersonData);
+          // 创建一个包含所有业务员的列表，有业绩的用真实数据，没业绩的显示0
+          const allSalesData = allSalespersons.map((sp: any) => {
+            const performanceRecord = performanceData.salesPersonData.find((p: any) => p.id === sp.id);
+            if (performanceRecord) {
+              return performanceRecord;
+            } else {
+              // 没有业绩的业务员，显示0
+              return {
+                id: sp.id,
+                name: sp.name,
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sp.name)}&background=random`,
+                department: sp.department,
+                revenue: 0,
+                completedSessions: 0,
+                completedCustomers: 0,
+                conversionRate: 0,
+                participantCount: 0,
+                trend: 'stable' as const
+              };
+            }
+          });
+          setSalesData(allSalesData);
         } else {
-          console.log('⚠️ 没有真实数据，使用模拟数据');
-          // 使用模拟数据作为备用
-          const [sales, monthly] = await Promise.all([
-            getSalesPersonsData(selectedTimeRange),
-            getMonthlySalesData()
-          ]);
-          
-          setSalesData(sales);
-          setMonthlySalesData(monthly);
+          console.log('⚠️ 没有真实数据，使用所有业务员列表');
+          // 使用所有业务员列表，业绩都显示为0
+          const allSalesData = allSalespersons.map((sp: any) => ({
+            id: sp.id,
+            name: sp.name,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sp.name)}&background=random`,
+            department: sp.department,
+            revenue: 0,
+            completedSessions: 0,
+            completedCustomers: 0,
+            conversionRate: 0,
+            participantCount: 0,
+            trend: 'stable' as const
+          }));
+          setSalesData(allSalesData);
+          setMonthlySalesData([]);
         }
+        
+        // 只显示培训计划中的课程（有实际培训场次的课程）
+        // 不需要合并courses表的数据
+        setCourseDetails(courseDetailData || []);
       } catch (error) {
         console.error('加载销售数据失败:', error);
         // 即使出错也设置空数组,避免页面崩溃
@@ -184,6 +284,69 @@ export default function SalesTracking() {
     setIsDetailModalOpen(true);
   };
 
+  // 打开导出模态框
+  const openExportModal = () => {
+    setIsExportModalOpen(true);
+  };
+
+  // 处理导出报表
+  const handleExportReport = async () => {
+    let toastId: string | number | undefined;
+    try {
+      const { toast } = await import('sonner');
+      const dataManagementService = (await import('@/lib/services/dataManagementService')).default;
+      
+      toastId = toast.loading('正在导出报表...');
+      
+      // 根据导出类型选择不同的配置
+      const config = exportType === 'salesperson' ? {
+        dataType: 'salesperson_performance' as const,
+        format: 'excel' as const,
+        range: 'filtered' as const,
+        selectedFields: ['name', 'department', 'revenue', 'completedSessions', 'completedCustomers', 'conversionRate'],
+        filters: performanceFilters
+      } : {
+        dataType: 'course_sales_performance' as const,
+        format: 'excel' as const,
+        range: 'filtered' as const,
+        selectedFields: ['courseName', 'sessions', 'participants', 'revenue', 'avgPrice', 'salespersonDetails'],
+        filters: {
+          ...courseSalesFilters,
+          // 转换年月为timeRange格式
+          timeRange: courseSalesFilters.month 
+            ? `${courseSalesFilters.year}-${courseSalesFilters.month.padStart(2, '0')}` 
+            : courseSalesFilters.year
+        }
+      };
+      
+      // 获取数据
+      const data = await dataManagementService.exportData(config, user?.id, user?.role, []);
+      
+      // 导出文件
+      const { exportToExcel } = await import('@/lib/exporters/fileExporter');
+      const blob = exportToExcel(data, config);
+      
+      // 下载文件
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = exportType === 'salesperson' 
+        ? `业务员业绩报表_${new Date().toLocaleDateString('zh-CN')}.xlsx`
+        : `课程销售报表_${new Date().toLocaleDateString('zh-CN')}.xlsx`;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast.dismiss(toastId);
+      toast.success('导出成功');
+      setIsExportModalOpen(false);
+    } catch (error: any) {
+      const { toast } = await import('sonner');
+      if (toastId) toast.dismiss(toastId);
+      toast.error(error.message || '导出失败');
+    }
+  };
+
   // 使用真实数据计算统计
   const totalRevenue = realPerformanceData?.totalRevenue || filteredSalesData.reduce((sum, item) => sum + item.revenue, 0);
   const totalParticipants = realPerformanceData?.totalParticipants || filteredSalesData.reduce((sum, item) => sum + (item.completedCustomers * 8), 0);
@@ -221,14 +384,12 @@ export default function SalesTracking() {
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">销售业绩</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative">
-                <i className="fas fa-bell"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationBell />
               {user?.role === 'admin' && (
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={openExportModal}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
                 >
                   <Download size={16} className="mr-2" />
@@ -398,7 +559,7 @@ export default function SalesTracking() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={courseDetails.slice(0, 5).map(course => ({
-                    name: course.courseName,
+                    name: course.courseNameOnly || course.courseName,
                     revenue: course.revenue,
                     participants: course.totalParticipants
                   }))}>
@@ -462,7 +623,9 @@ export default function SalesTracking() {
                     onChange={(e) => setSelectedTimeRange(e.target.value)}
                     className="text-sm px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   >
+                    <option value="全部">全部</option>
                     <option value="本月">本月</option>
+                    <option value="上月">上月</option>
                     <option value="本季度">本季度</option>
                     <option value="本年">本年</option>
                   </select>
@@ -668,13 +831,15 @@ export default function SalesTracking() {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {courseDetails && courseDetails.length > 0 ? (
-                  courseDetails.map((course: any) => {
-                    const isExpanded = expandedCourses.has(course.id);
+                  courseDetails.map((course: any, index: number) => {
+                    // 使用组合键确保唯一性
+                    const uniqueKey = course.id || `course-${index}`;
+                    const isExpanded = expandedCourses.has(uniqueKey);
                     return (
-                      <Fragment key={course.id}>
+                      <Fragment key={uniqueKey}>
                         <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {course.courseName}
+                            {course.courseNameOnly || course.courseName}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {course.sessionDate ? new Date(course.sessionDate).toLocaleDateString('zh-CN') : '-'}
@@ -717,11 +882,12 @@ export default function SalesTracking() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <button
                               onClick={() => {
+                                const uniqueKey = course.id || `course-${index}`;
                                 const newExpanded = new Set(expandedCourses);
                                 if (isExpanded) {
-                                  newExpanded.delete(course.id);
+                                  newExpanded.delete(uniqueKey);
                                 } else {
-                                  newExpanded.add(course.id);
+                                  newExpanded.add(uniqueKey);
                                 }
                                 setExpandedCourses(newExpanded);
                               }}
@@ -1000,6 +1166,202 @@ export default function SalesTracking() {
                   关闭
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* 导出报表模态框 */}
+      {isExportModalOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+          onClick={() => setIsExportModalOpen(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">导出业绩报表</h2>
+            
+            {/* 导出类型选择 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">导出类型</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setExportType('salesperson')}
+                  className={`py-2 px-4 rounded-lg border-2 transition-all ${
+                    exportType === 'salesperson'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  按业务员导出
+                </button>
+                <button
+                  onClick={() => setExportType('course')}
+                  className={`py-2 px-4 rounded-lg border-2 transition-all ${
+                    exportType === 'course'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  按课程导出
+                </button>
+              </div>
+            </div>
+
+
+            {/* 业务员业绩筛选 */}
+            {exportType === 'salesperson' && (
+              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">业绩筛选条件</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      时间范围
+                    </label>
+                    <select
+                      value={performanceFilters.timeRange}
+                      onChange={(e) => setPerformanceFilters(prev => ({ ...prev, timeRange: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="全部">全部时间</option>
+                      <option value="本月">本月</option>
+                      <option value="本季度">本季度</option>
+                      <option value="本年度">本年度</option>
+                      <option value="上月">上月</option>
+                      <option value="上季度">上季度</option>
+                      <option value="去年">去年</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      部门
+                    </label>
+                    <select
+                      value={performanceFilters.department}
+                      onChange={(e) => setPerformanceFilters(prev => ({ ...prev, department: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="全部">全部部门</option>
+                      <option value="销售一部">销售一部</option>
+                      <option value="销售二部">销售二部</option>
+                      <option value="销售三部">销售三部</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      业务员
+                    </label>
+                    <select
+                      value={performanceFilters.salesperson}
+                      onChange={(e) => setPerformanceFilters(prev => ({ ...prev, salesperson: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="全部">全部业务员</option>
+                      {filteredSalespersonsForExport.map(sp => (
+                        <option key={sp.id} value={sp.name}>{sp.name}</option>
+                      ))}
+                    </select>
+                    {performanceFilters.department !== '全部' && (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        仅显示 {performanceFilters.department} 的业务员
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 课程销售业绩筛选 */}
+            {exportType === 'course' && (
+              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">课程筛选条件</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      年份
+                    </label>
+                    <select
+                      value={courseSalesFilters.year}
+                      onChange={(e) => {
+                        setCourseSalesFilters(prev => ({ ...prev, year: e.target.value, course: '全部' }));
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      {availableYears.length > 0 ? (
+                        availableYears.map(year => (
+                          <option key={year} value={year}>{year}年</option>
+                        ))
+                      ) : (
+                        <option value={new Date().getFullYear().toString()}>{new Date().getFullYear()}年</option>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      月份
+                    </label>
+                    <select
+                      value={courseSalesFilters.month}
+                      onChange={(e) => {
+                        setCourseSalesFilters(prev => ({ ...prev, month: e.target.value, course: '全部' }));
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="">全年</option>
+                      {[...Array(12)].map((_, i) => (
+                        <option key={i+1} value={(i+1).toString()}>{i+1}月</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      课程
+                    </label>
+                    <select
+                      value={courseSalesFilters.course}
+                      onChange={(e) => setCourseSalesFilters(prev => ({ ...prev, course: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="全部">全部课程</option>
+                      {filteredCoursesForExport.map(course => (
+                        <option key={course.name} value={course.name}>
+                          {course.name} ({course.sessions.length}场)
+                        </option>
+                      ))}
+                    </select>
+                    {filteredCoursesForExport.length === 0 && (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        该时间段没有培训计划
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 按钮区域 */}
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleExportReport}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center"
+              >
+                <Download size={16} className="mr-2" />
+                确认导出
+              </button>
             </div>
           </motion.div>
         </motion.div>

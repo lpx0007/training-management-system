@@ -13,6 +13,11 @@ export function exportToExcel(data: any[], config: ExportConfig): Blob {
     return exportSalespersonPerformanceExcel(data, config);
   }
   
+  // 特殊处理：课程销售业绩导出（每个课程一个工作表）
+  if (config.dataType === 'course_sales_performance') {
+    return exportCoursePerformanceExcel(data);
+  }
+  
   // 1. 准备数据
   const mappedData = data.map(row => {
     const mappedRow: any = {};
@@ -176,6 +181,120 @@ function formatValue(value: any, field: string): string {
   return value.toString();
 }
 
+// 导出课程销售业绩（每个课程一个工作表）
+function exportCoursePerformanceExcel(data: any[]): Blob {
+  const wb = XLSX.utils.book_new();
+  
+  // 1. 创建汇总工作表
+  const summaryData = data.map(row => {
+    // 从 courseName 中提取纯课程名
+    let courseNameOnly = row.courseNameOnly || row.courseName || '';
+    if (courseNameOnly.includes('（')) {
+      courseNameOnly = courseNameOnly.split('（')[0];
+    }
+    
+    return {
+      '课程名称': courseNameOnly,
+      '开课日期': row.sessionDate ? new Date(row.sessionDate).toLocaleDateString('zh-CN') : '',
+      '结束日期': row.endDate ? new Date(row.endDate).toLocaleDateString('zh-CN') : '',
+      '培训地点': row.area || '',
+      '线上价格': row.onlinePrice ? `￥${row.onlinePrice}` : '￥0',
+      '线下价格': row.offlinePrice ? `￥${row.offlinePrice}` : '￥0',
+      '参训人数': row.totalParticipants || 0,
+      '线上人数': row.onlineParticipants || 0,
+      '线下人数': row.offlineParticipants || 0,
+      '销售额': row.revenue ? `￥${row.revenue.toFixed(2)}` : '￥0.00',
+      '状态': row.status || ''
+    };
+  });
+  
+  const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+  summaryWs['!cols'] = [
+    { wch: 40 }, // 课程名称
+    { wch: 12 }, // 开课日期
+    { wch: 12 }, // 结束日期
+    { wch: 15 }, // 培训地点
+    { wch: 10 }, // 线上价格
+    { wch: 10 }, // 线下价格
+    { wch: 10 }, // 参训人数
+    { wch: 10 }, // 线上人数
+    { wch: 10 }, // 线下人数
+    { wch: 12 }, // 销售额
+    { wch: 10 }  // 状态
+  ];
+  
+  XLSX.utils.book_append_sheet(wb, summaryWs, '课程汇总');
+  
+  // 2. 为每个课程创建客户明细工作表
+  data.forEach((course: any) => {
+    const participantsList = course.participantsList || course.participants || [];
+    
+    if (participantsList.length === 0) {
+      return; // 如果没有参训人员，跳过
+    }
+    
+    // 准备客户成交明细数据
+    const detailData = participantsList.map((participant: any) => {
+      // 处理日期
+      let regDate = '';
+      if (participant.registrationDate) {
+        try {
+          const date = new Date(participant.registrationDate);
+          if (!isNaN(date.getTime())) {
+            regDate = date.toLocaleDateString('zh-CN');
+          }
+        } catch (e) {
+          console.error('解析registrationDate失败:', participant.registrationDate);
+        }
+      }
+      
+      // 处理金额
+      const amount = participant.actualPrice || participant.amount || 0;
+      const amountStr = typeof amount === 'number' ? `￥${amount.toFixed(2)}` : '￥0.00';
+      
+      return {
+        '客户姓名': participant.customerName || '',
+        '联系电话': participant.customerPhone || '',
+        '所属公司': participant.customerCompany || '',
+        '业务员姓名': participant.salespersonName || '',
+        '参训模式': participant.participationMode || '',
+        '成交金额': amountStr,
+        '成交日期': regDate
+      };
+    });
+    
+    const detailWs = XLSX.utils.json_to_sheet(detailData);
+    detailWs['!cols'] = [
+      { wch: 15 }, // 客户姓名
+      { wch: 15 }, // 联系电话
+      { wch: 25 }, // 所属公司
+      { wch: 15 }, // 业务员姓名
+      { wch: 12 }, // 参训模式
+      { wch: 12 }, // 成交金额
+      { wch: 12 }  // 成交日期
+    ];
+    
+    // 工作表名称限制：最多31个字符，不能包含特殊字符
+    let sheetName = course.courseNameOnly || course.courseName || '未知课程';
+    // 如果包含日期，提取课程名
+    if (sheetName.includes('（')) {
+      sheetName = sheetName.split('（')[0];
+    }
+    sheetName = sheetName.replace(/[\\\/\?\*\[\]]/g, ''); // 移除非法字符
+    if (sheetName.length > 31) {
+      sheetName = sheetName.substring(0, 31);
+    }
+    
+    XLSX.utils.book_append_sheet(wb, detailWs, sheetName);
+  });
+  
+  // 3. 生成文件
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([excelBuffer], { 
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  });
+}
+
 // 导出业务员业绩（包含明细工作表）
 function exportSalespersonPerformanceExcel(data: any[], config: ExportConfig): Blob {
   const wb = XLSX.utils.book_new();
@@ -224,15 +343,63 @@ function exportSalespersonPerformanceExcel(data: any[], config: ExportConfig): B
       return; // 如果没有成交客户，跳过
     }
     
-    // 准备明细数据
-    const detailData = customerList.map((customer: any) => ({
-      '客户姓名': customer.name || '',
-      '联系电话': customer.phone || '',
-      '所属公司': customer.company || '',
-      '课程名称': customer.courseName || '',
-      '成交金额': customer.amount ? `¥${customer.amount.toFixed(2)}` : '¥0.00',
-      '成交日期': customer.latestDate ? new Date(customer.latestDate).toLocaleDateString('zh-CN') : ''
-    }));
+    // 准备明细数据（分离课程名称和时间）
+    const detailData = customerList.map((customer: any) => {
+      // 解析课程名称和时间
+      let courseNameOnly = customer.courseNameOnly || customer.courseName || '';
+      let startDate = '';
+      let endDate = '';
+      
+      // 如果 courseName 包含时间，解析出来
+      if (customer.courseName && customer.courseName.includes('（')) {
+        const match = customer.courseName.match(/(.+?)（(.+?)）/);
+        if (match) {
+          courseNameOnly = match[1];
+          const dateRange = match[2];
+          if (dateRange.includes(' - ')) {
+            const dates = dateRange.split(' - ');
+            startDate = dates[0];
+            endDate = dates[1];
+          } else {
+            startDate = dateRange;
+            endDate = dateRange;
+          }
+        }
+      }
+      
+      // 如果有单独的日期字段，优先使用
+      if (customer.sessionDate) {
+        try {
+          const date = new Date(customer.sessionDate);
+          if (!isNaN(date.getTime())) {
+            startDate = date.toLocaleDateString('zh-CN');
+          }
+        } catch (e) {
+          console.error('解析sessionDate失败:', customer.sessionDate);
+        }
+      }
+      if (customer.sessionEndDate) {
+        try {
+          const date = new Date(customer.sessionEndDate);
+          if (!isNaN(date.getTime())) {
+            endDate = date.toLocaleDateString('zh-CN');
+          }
+        } catch (e) {
+          console.error('解析sessionEndDate失败:', customer.sessionEndDate);
+        }
+      }
+      
+      return {
+        '客户姓名': customer.name || '',
+        '联系电话': customer.phone || '',
+        '所属公司': customer.company || '',
+        '课程名称': courseNameOnly,
+        '开始日期': startDate,
+        '结束日期': endDate,
+        '成交金额': customer.amount ? `￥${customer.amount.toFixed(2)}` : '￥0.00',
+        '成交日期': customer.latestDate ? new Date(customer.latestDate).toLocaleDateString('zh-CN') : ''
+      };
+    });
     
     const detailWs = XLSX.utils.json_to_sheet(detailData);
     
@@ -241,9 +408,11 @@ function exportSalespersonPerformanceExcel(data: any[], config: ExportConfig): B
       { wch: 15 }, // 客户姓名
       { wch: 15 }, // 联系电话
       { wch: 25 }, // 所属公司
-      { wch: 30 }, // 课程名称
+      { wch: 25 }, // 课程名称
+      { wch: 12 }, // 开始日期
+      { wch: 12 }, // 结束日期
       { wch: 12 }, // 成交金额
-      { wch: 15 }  // 成交日期
+      { wch: 12 }  // 成交日期
     ];
     
     // 设置表头样式

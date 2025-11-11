@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/Notifications/NotificationBell';
 import { toast } from 'sonner';
 import dataService from '@/lib/dataService';
 
@@ -235,10 +236,7 @@ export default function DataExport() {
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">数据导出与分析</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative">
-                <i className="fas fa-bell"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationBell />
             </div>
           </div>
         </header>

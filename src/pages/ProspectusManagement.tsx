@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/Notifications/NotificationBell';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { toast } from 'sonner';
 import prospectusService from '@/lib/supabase/prospectusService';
@@ -233,10 +234,7 @@ export default function ProspectusManagement() {
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">招商简章</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative">
-                <i className="fas fa-bell"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationBell />
               <PermissionGuard permission="prospectus_upload">
                 <button 
                   onClick={openUploadModal}

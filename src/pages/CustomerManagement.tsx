@@ -15,10 +15,14 @@ import {
   Clock,
   DollarSign,
   UserPlus,
-  UserCircle
+  UserCircle,
+  Upload,
+  Download
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/Notifications/NotificationBell';
+import CustomerImportModal from '@/components/CustomerImportModal';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { toast } from 'sonner';
 import { generateDefaultAvatar } from '@/utils/imageUtils';
@@ -49,6 +53,7 @@ export default function CustomerManagement() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editCustomerData, setEditCustomerData] = useState<Partial<CustomerFrontend>>({});
   const [newCustomerData, setNewCustomerData] = useState<Partial<CustomerFrontend>>({
     name: '',
@@ -543,7 +548,63 @@ export default function CustomerManagement() {
       }
     } catch (error) {
       console.error('更新客户信息失败', error);
-      toast.error('更新客户信息失败，请重试');
+      toast.error('更新客户信息失败');
+    }
+  };
+
+  // 处理导入客户
+  const handleImportCustomers = async (data: any[]) => {
+    try {
+      const dataManagementService = (await import('@/lib/services/dataManagementService')).default;
+      
+      const toastId = toast.loading('正在导入客户...');
+      
+      const result = await dataManagementService.importData('customers', data, 'skip');
+      
+      toast.dismiss(toastId);
+      
+      if (result.success > 0) {
+        toast.success(`成功导入 ${result.success} 位客户`);
+        const customers = await supabaseService.getCustomers();
+        setAllCustomers(customers);
+      }
+      if (result.failed > 0) {
+        toast.error(`${result.failed} 位客户导入失败`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || '导入失败');
+    }
+  };
+
+  // 处理导出客户
+  const handleExportCustomers = async () => {
+    const toastId = toast.loading('正在导出...');
+    
+    try {
+      // 根据筛选条件导出数据
+      const exportData = filteredCustomers.map(customer => ({
+        客户姓名: customer.name,
+        手机号: customer.phone || '',
+        邮箱: customer.email || '',
+        公司名称: customer.company || '',
+        职位: customer.position || '',
+        地区: customer.location || '',
+        负责业务员: customer.salesperson_name || '',
+        客户状态: customer.status || '潜在客户'
+      }));
+      
+      // 导出文件
+      const XLSX = await import('xlsx');
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '客户信息');
+      XLSX.writeFile(wb, `客户信息_${new Date().toLocaleDateString('zh-CN')}.xlsx`);
+      
+      toast.dismiss(toastId);
+      toast.success(`成功导出 ${exportData.length} 条客户数据`);
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      toast.error(error.message || '导出失败');
     }
   };
 
@@ -729,18 +790,46 @@ export default function CustomerManagement() {
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">客户信息管理</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 relative"><i className="fas fa-bell"></i>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationBell />
+              
+              {/* 导入客户 */}
+              <PermissionGuard permission="customer_import">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm flex items-center"
+                  title="批量导入客户"
+                >
+                  <Upload size={16} className="sm:mr-2" />
+                  <span className="hidden sm:inline">导入</span>
+                </motion.button>
+              </PermissionGuard>
+              
+              {/* 导出客户 */}
+              <PermissionGuard permission="customer_export">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleExportCustomers}
+                  className="px-2 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-sm flex items-center"
+                  title="导出客户数据"
+                >
+                  <Download size={16} className="sm:mr-2" />
+                  <span className="hidden sm:inline">导出</span>
+                </motion.button>
+              </PermissionGuard>
+              
+              {/* 添加客户 */}
               <PermissionGuard permission="customer_add">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={openAddModal}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center"
+                  className="px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center text-sm sm:text-base"
                 >
-                  <Plus size={16} className="mr-2" />
-                  添加客户
+                  <Plus size={16} className="sm:mr-2" />
+                  <span className="ml-1 sm:ml-0">添加<span className="hidden sm:inline">客户</span></span>
                 </motion.button>
               </PermissionGuard>
             </div>
@@ -1807,6 +1896,13 @@ export default function CustomerManagement() {
           </motion.div>
         </motion.div>
       )}
+
+      {/* 导入客户模态框 */}
+      <CustomerImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportCustomers}
+      />
     </div>
   );
 }

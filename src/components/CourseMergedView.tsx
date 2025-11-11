@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import { ChevronDown, ChevronRight, Calendar, Users, DollarSign, Plus, Edit, Trash2, User } from 'lucide-react';
+import { ChevronDown, ChevronRight, Calendar, Plus, Edit, Trash2 } from 'lucide-react';
 import { AuthContext } from '@/contexts/authContext';
 import type { CourseWithSessions } from '@/lib/supabase/types';
 
@@ -14,8 +14,7 @@ interface ModuleGroup {
   module: string;
   courses: CourseWithSessions[];
   totalSessions: number;
-  totalParticipants: number;
-  totalRevenue: number;
+  totalDays: number;
 }
 
 export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: CourseMergedViewProps) {
@@ -25,19 +24,18 @@ export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: Co
   // 按模块分组
   const groupedByModule: ModuleGroup[] = courses.reduce((acc, course) => {
     const existingGroup = acc.find(g => g.module === course.module);
+    const courseDays = (course.sessionsPerYear || 0) * (course.durationDays || 0);
     
     if (existingGroup) {
       existingGroup.courses.push(course);
-      existingGroup.totalSessions += course.actualSessionCount || 0;
-      existingGroup.totalParticipants += course.totalParticipants || 0;
-      existingGroup.totalRevenue += course.totalRevenue || 0;
+      existingGroup.totalSessions += course.sessionsPerYear || 0;
+      existingGroup.totalDays += courseDays;
     } else {
       acc.push({
         module: course.module,
         courses: [course],
-        totalSessions: course.actualSessionCount || 0,
-        totalParticipants: course.totalParticipants || 0,
-        totalRevenue: course.totalRevenue || 0,
+        totalSessions: course.sessionsPerYear || 0,
+        totalDays: courseDays,
       });
     }
     
@@ -118,14 +116,8 @@ export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: Co
                       <div className="font-semibold text-gray-900 dark:text-white">{group.totalSessions}</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-gray-500 dark:text-gray-400 text-xs">总参训</div>
-                      <div className="font-semibold text-gray-900 dark:text-white">{group.totalParticipants}人</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-500 dark:text-gray-400 text-xs">总收入</div>
-                      <div className="font-semibold text-green-600 dark:text-green-400">
-                        ¥{group.totalRevenue.toLocaleString()}
-                      </div>
+                      <div className="text-gray-500 dark:text-gray-400 text-xs">总天数</div>
+                      <div className="font-semibold text-gray-900 dark:text-white">{group.totalDays}</div>
                     </div>
                   </div>
                 </div>
@@ -162,22 +154,11 @@ export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: Co
                                 {course.durationDays}天/期
                               </span>
                               <span className="font-medium">
-                                {course.actualSessionCount}/{course.sessionsPerYear}期
+                                {course.sessionsPerYear}期
                               </span>
-                              <span className="flex items-center gap-1">
-                                <Users size={14} />
-                                {course.totalParticipants}人
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                总天数: {(course.sessionsPerYear || 0) * (course.durationDays || 0)}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <DollarSign size={14} />
-                                ¥{course.standardFee?.toLocaleString() || '-'}
-                              </span>
-                              {course.projectManagerName && (
-                                <span className="flex items-center gap-1">
-                                  <User size={14} />
-                                  {course.projectManagerName}
-                                </span>
-                              )}
                             </div>
 
                             {course.description && (
@@ -197,7 +178,7 @@ export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: Co
                               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                               title="添加场次"
                             >
-                              <Plus size={16} />
+                              <Plus size={20} />
                             </button>
                             <button
                               onClick={(e) => {
@@ -207,7 +188,7 @@ export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: Co
                               className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                               title="编辑课程"
                             >
-                              <Edit size={16} />
+                              <Edit size={20} />
                             </button>
                             {user?.role === 'admin' && onDelete && (
                               <button
@@ -218,7 +199,7 @@ export function CourseMergedView({ courses, onAddSession, onEdit, onDelete }: Co
                                 className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                                 title="删除课程"
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={20} />
                               </button>
                             )}
                           </div>
