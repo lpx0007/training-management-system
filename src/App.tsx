@@ -18,6 +18,7 @@ import ProspectusManagement from '@/pages/ProspectusManagement';
 import InitDepartmentManager from '@/pages/InitDepartmentManager';
 import CourseManagement from '@/pages/CourseManagement';
 import AuditLogs from '@/pages/AuditLogs';
+import PermissionTest from '@/pages/PermissionTest';
 import { useState, useEffect } from "react";
 import { AuthContext, User } from '@/contexts/authContext';
 import { toast } from 'sonner';
@@ -184,6 +185,7 @@ export default function App() {
           role: profile.role,
           name: profile.name,
           department: profile.department || undefined,
+          department_id: profile.department_id || undefined,
           avatar: profile.avatar || undefined,
           permissions: userPermissions,
           menuAccess: userMenuAccess,
@@ -243,6 +245,7 @@ export default function App() {
           role: profile.role,
           name: profile.name,
           department: profile.department || undefined,
+          department_id: profile.department_id || undefined,
           avatar: profile.avatar || undefined,
           permissions: userPermissions,
           menuAccess: userMenuAccess,
@@ -453,6 +456,11 @@ export default function App() {
         <Route path="/permission-management" element={
           <ProtectedRoute requiredRole={['admin']}>
             <PermissionManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/permission-test" element={
+          <ProtectedRoute requiredRole={['admin']}>
+            <PermissionTest />
           </ProtectedRoute>
         } />
         <Route path="/profile-settings" element={

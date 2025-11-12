@@ -33,8 +33,9 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'customer_delete',
       'customer_import',
       'customer_export',
+      'data_download_template', // 支持下载导入模板
     ],
-    description: '客户管理页面的所有操作权限'
+    description: '客户管理页面的所有操作权限，包括导入导出功能'
   },
   {
     featureId: 'training_management',
@@ -48,12 +49,26 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'training_view_stats',
       'training_import',
       'training_export',
+      'data_download_template', // 支持下载导入模板
       // 跨功能权限：培训详情中可以下载招商简章
       'prospectus_download',
       // 跨功能权限：培训详情中可以查看专家信息
       'expert_view',
     ],
     description: '培训计划页面的所有操作权限，包括下载招商简章和查看专家信息'
+  },
+  {
+    featureId: 'course_management',
+    permissions: [
+      'training_view',
+      'training_add',
+      'training_edit',
+      'training_delete',
+      'training_import',
+      'training_export',
+      'data_download_template', // 支持下载导入模板
+    ],
+    description: '课程管理页面的所有操作权限，包括导入导出功能'
   },
   {
     featureId: 'expert_management',
@@ -66,8 +81,9 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'expert_profile_edit',
       'expert_import',
       'expert_export',
+      'data_download_template', // 支持下载导入模板
     ],
-    description: '专家管理页面的所有操作权限'
+    description: '专家管理页面的所有操作权限，包括导入导出功能'
   },
   {
     featureId: 'salesperson_management',
@@ -80,8 +96,9 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'performance_view_all_departments',
       'salesperson_import',
       'salesperson_export',
+      'data_download_template', // 支持下载导入模板
     ],
-    description: '业务员管理页面的所有操作权限'
+    description: '业务员管理页面的所有操作权限，包括导入导出功能'
   },
   {
     featureId: 'prospectus_management',
@@ -107,37 +124,16 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
     description: '海报生成页面的所有操作权限'
   },
   {
-    featureId: 'data_management',
-    permissions: [
-      // 各模块的导入导出权限
-      'customer_import',
-      'customer_export',
-      'training_import',
-      'training_export',
-      'expert_import',
-      'expert_export',
-      'salesperson_import',
-      'salesperson_export',
-      'prospectus_import',
-      'prospectus_export',
-      // 业绩数据导出权限
-      'performance_export',
-      // 通用数据管理权限
-      'data_download_template',
-      'data_view_history',
-    ],
-    description: '数据管理页面的所有操作权限，根据用户拥有的细分权限显示对应的导入导出选项'
-  },
-  {
     featureId: 'sales_tracking',
     permissions: [
       'salesperson_view_performance',
       'performance_view_all_departments',
+      'performance_export', // 支持导出业绩数据
       // 跨功能权限：销售追踪需要查看客户数据
       'customer_view',
       'customer_view_all',
     ],
-    description: '销售追踪页面的所有操作权限'
+    description: '销售追踪页面的所有操作权限，包括导出业绩数据'
   },
   {
     featureId: 'permission_management',

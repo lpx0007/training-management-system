@@ -181,9 +181,11 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'customer_view_all',
     'customer_add',
     'customer_edit',
+    'customer_delete',      // 删除客户
     'customer_export',
     // 培训管理
     'training_view',
+    'training_manage_participant',  // 管理培训参与者
     'training_view_stats',
     'training_export',
     // 业务员管理
@@ -191,6 +193,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'salesperson_add',
     'salesperson_edit',
     'salesperson_view_performance',
+    // 招商简章
+    'prospectus_view',      // 查看简章
+    'prospectus_download',  // 下载简章
     // 数据管理
     'performance_export', // 可以导出业绩数据
     'data_view_history',

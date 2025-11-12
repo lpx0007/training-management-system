@@ -1,5 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
-import { AuthContext } from '@/contexts/authContext';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { 
   FileText, 
@@ -24,7 +23,6 @@ import { getStatusText, getStatusClassName, calculateTrainingStatus } from '@/ut
 
 export default function ProspectusManagement() {
   const location = useLocation();
-  const { user } = useContext(AuthContext);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
@@ -1346,7 +1344,24 @@ function DownloadHistoryModal({ isOpen, prospectus, onClose }: DownloadHistoryMo
           </div>
 
           {/* 关闭按钮 */}
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex justify-end gap-2">
+            <PermissionGuard permission="prospectus_download">
+              <button
+                onClick={async () => {
+                  try {
+                    const url = await prospectusService.downloadProspectus(prospectus.id, true);
+                    window.open(url, '_blank');
+                    toast.success('开始下载简章');
+                  } catch (error: any) {
+                    toast.error(error.message || '下载失败，请重试');
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center"
+              >
+                <Download size={16} className="mr-2" />
+                下载简章
+              </button>
+            </PermissionGuard>
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"

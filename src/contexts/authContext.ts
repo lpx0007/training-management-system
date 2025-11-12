@@ -10,6 +10,7 @@ export interface User {
   role: UserRole;
   name: string;
   department?: string;
+  department_id?: number; // 部门ID
   avatar?: string | null; // 用户头像 URL
   permissions?: string[]; // 用户权限列表
   menuAccess?: string[]; // 用户可访问的功能面板列表

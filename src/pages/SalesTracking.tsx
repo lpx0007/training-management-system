@@ -54,7 +54,7 @@ export default function SalesTracking() {
   // 业务员业绩筛选
   const [performanceFilters, setPerformanceFilters] = useState({
     timeRange: '本月',
-    department: '全部',
+    department: user?.role === 'manager' ? (user.department || '全部') : '全部',
     salesperson: '全部'
   });
   // 课程销售业绩筛选
@@ -127,12 +127,12 @@ export default function SalesTracking() {
         setLoading(true);
         console.log('开始加载销售追踪数据...');
         
-        // 加载真实业绩数据 - 不传递用户筛选参数，获取所有数据
+        // 加载真实业绩数据 - 传递用户信息用于权限过滤
         const [performanceData, topPerf, lastMonthData, currentMonthData, courseDetailData, allSalespersons] = await Promise.all([
-          getMonthlyPerformance(selectedTimeRange), // 不传递 user?.id 和 user?.department
+          getMonthlyPerformance(selectedTimeRange, user?.role, user?.department_id, user?.permissions), // 传递用户角色、部门ID和权限
           getTopPerformers(selectedTimeRange, user?.role, user?.department),
-          getMonthlyPerformance('上月'),
-          getMonthlyPerformance('本月'),
+          getMonthlyPerformance('上月', user?.role, user?.department_id, user?.permissions),
+          getMonthlyPerformance('本月', user?.role, user?.department_id, user?.permissions),
           getCoursePerformanceDetail(selectedCourse, selectedTimeRange),
           // 获取所有业务员（用于导出筛选）
           getAllSalespersons()
@@ -233,20 +233,20 @@ export default function SalesTracking() {
       result = result.filter(salesperson => salesperson.department === selectedDepartment);
     }
     
-    // 权限控制 - 暂时注释掉，显示所有数据
-    // if (user?.role === 'admin') {
-    //   // 管理员：查看所有数据（不过滤）
-    // } else if (user?.role === 'manager') {
-    //   // 部门经理：只查看本部门数据
-    //   if (user.department) {
-    //     result = result.filter(salesperson => 
-    //       salesperson.department === user.department
-    //     );
-    //   }
-    // } else if (user?.role === 'salesperson') {
-    //   // 业务员：只查看自己的数据  
-    //   result = result.filter(salesperson => String(salesperson.id) === String(user.id));
-    // }
+    // 权限控制
+    if (user?.role === 'admin') {
+      // 管理员：查看所有数据（不过滤）
+    } else if (user?.role === 'manager') {
+      // 部门经理：只查看本部门数据
+      if (user.department) {
+        result = result.filter(salesperson => 
+          salesperson.department === user.department
+        );
+      }
+    } else if (user?.role === 'salesperson') {
+      // 业务员：只查看自己的数据  
+      result = result.filter(salesperson => String(salesperson.id) === String(user.id));
+    }
     
     // 排序
     if (sortConfig) {
@@ -385,7 +385,7 @@ export default function SalesTracking() {
             </div>
             <div className="flex items-center space-x-4">
               <NotificationBell />
-              {user?.role === 'admin' && (
+              {(user?.role === 'admin' || user?.role === 'manager') && (
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -1244,16 +1244,27 @@ export default function SalesTracking() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       部门
                     </label>
-                    <select
-                      value={performanceFilters.department}
-                      onChange={(e) => setPerformanceFilters(prev => ({ ...prev, department: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="全部">全部部门</option>
-                      <option value="销售一部">销售一部</option>
-                      <option value="销售二部">销售二部</option>
-                      <option value="销售三部">销售三部</option>
-                    </select>
+                    {user?.role === 'manager' ? (
+                      // 部门经理只能导出自己的部门
+                      <input
+                        type="text"
+                        value={user.department || '未分配部门'}
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+                      />
+                    ) : (
+                      // 管理员可以选择部门
+                      <select
+                        value={performanceFilters.department}
+                        onChange={(e) => setPerformanceFilters(prev => ({ ...prev, department: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="全部">全部部门</option>
+                        <option value="销售一部">销售一部</option>
+                        <option value="销售二部">销售二部</option>
+                        <option value="销售三部">销售三部</option>
+                      </select>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

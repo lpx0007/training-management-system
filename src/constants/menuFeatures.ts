@@ -173,8 +173,8 @@ export const ROLE_DEFAULT_MENU_FEATURES: Record<UserRole, string[]> = {
     'dashboard',
     'customer_management',
     'training_management',
-    'course_management',
     'salesperson_management',
+    'sales_tracking',
     'profile_settings',
   ]
 };

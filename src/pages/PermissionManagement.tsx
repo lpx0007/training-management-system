@@ -6,7 +6,7 @@
 import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { motion } from 'framer-motion';
-import { Shield, Search, Users as UsersIcon } from 'lucide-react';
+import { Shield, Search, Users as UsersIcon, UserCog } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
 import supabaseService from '@/lib/supabase/supabaseService';
@@ -14,6 +14,7 @@ import { getPermissionCategories, getPermissionById, getRoleDefaultPermissions }
 import { MENU_FEATURES, getRoleDefaultMenuFeatures } from '@/constants/menuFeatures';
 import { getFeaturePermissions, getFeaturePermissionDescription } from '@/constants/featurePermissionMapping';
 import { toast } from 'sonner';
+import UserRoleEditModal from '@/components/UserRoleEditModal';
 
 // 用户接口（包含权限和功能面板信息）
 interface UserWithPermissions {
@@ -22,6 +23,7 @@ interface UserWithPermissions {
   role: 'admin' | 'salesperson' | 'expert' | 'manager';
   name: string;
   department: string | null;
+  department_id?: number;
   status: string;
   permissions: string[];
   menuAccess: string[];
@@ -48,6 +50,10 @@ export default function PermissionManagement() {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [selectedRoleForBatch, setSelectedRoleForBatch] = useState<'admin' | 'salesperson' | 'expert' | 'manager' | null>(null);
   const [batchStrategy, setBatchStrategy] = useState<'override' | 'merge' | 'reset'>('merge');
+  
+  // 角色编辑状态
+  const [isRoleEditModalOpen, setIsRoleEditModalOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<UserWithPermissions | null>(null);
 
   // 权限分类和功能面板
   const permissionCategories = getPermissionCategories();
@@ -281,9 +287,9 @@ export default function PermissionManagement() {
         />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <Shield className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">访问受限</h2>
-            <p className="text-gray-600 dark:text-gray-400">只有管理员可以访问权限管理功能</p>
+            <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-2">权限不足</h2>
+            <p className="text-gray-500 dark:text-gray-400">只有管理员可以访问权限管理页面</p>
           </div>
         </div>
       </div>
@@ -316,18 +322,18 @@ export default function PermissionManagement() {
 
         {/* 主内容区域 */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {/* 统计卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* 统计卡片和测试按钮 - 合并到一行 */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
             <motion.div 
               whileHover={{ y: -2 }}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700"
+              className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl shadow-sm p-2 sm:p-4 border border-gray-100 dark:border-gray-700"
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">用户总数</p>
-                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{users.length}</h3>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">用户总数</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mt-1">{users.length}</h3>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                <div className="hidden sm:flex w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 items-center justify-center">
                   <UsersIcon className="text-blue-600 dark:text-blue-400" size={24} />
                 </div>
               </div>
@@ -335,19 +341,33 @@ export default function PermissionManagement() {
 
             <motion.div 
               whileHover={{ y: -2 }}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700"
+              className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl shadow-sm p-2 sm:p-4 border border-gray-100 dark:border-gray-700"
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">系统权限总数</p>
-                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">系统权限总数</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mt-1">
                     {permissionCategories.reduce((sum, cat) => sum + cat.permissions.length, 0)}
                   </h3>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
+                <div className="hidden sm:flex w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/50 items-center justify-center">
                   <Shield className="text-purple-600 dark:text-purple-400" size={24} />
                 </div>
               </div>
+            </motion.div>
+
+            {/* 权限测试按钮 - 作为第三列 */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl shadow-sm p-2 sm:p-4 border border-gray-100 dark:border-gray-700 flex items-center justify-center"
+            >
+              <a
+                href="/permission-test"
+                className="inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-6 py-2 sm:py-3 bg-purple-600 text-white rounded-md sm:rounded-lg hover:bg-purple-700 transition-colors shadow-sm w-full justify-center"
+              >
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium text-sm sm:text-base">权限测试验证</span>
+              </a>
             </motion.div>
           </div>
 
@@ -566,12 +586,26 @@ export default function PermissionManagement() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <button
-                            onClick={() => openPermissionModal(u)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 text-sm font-medium"
-                          >
-                            管理权限
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {user?.role === 'admin' && (
+                              <button
+                                onClick={() => {
+                                  setUserToEdit(u);
+                                  setIsRoleEditModalOpen(true);
+                                }}
+                                className="text-purple-600 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300 text-sm font-medium flex items-center gap-1"
+                              >
+                                <UserCog size={14} />
+                                角色
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openPermissionModal(u)}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 text-sm font-medium"
+                            >
+                              管理权限
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -991,6 +1025,19 @@ export default function PermissionManagement() {
             </div>
           </motion.div>
         </div>
+      )}
+      
+      {/* 用户角色编辑模态框 */}
+      {userToEdit && (
+        <UserRoleEditModal
+          isOpen={isRoleEditModalOpen}
+          onClose={() => {
+            setIsRoleEditModalOpen(false);
+            setUserToEdit(null);
+          }}
+          user={userToEdit}
+          onSave={loadUsers}
+        />
       )}
     </div>
   );

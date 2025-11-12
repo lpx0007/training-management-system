@@ -12,6 +12,7 @@ interface ParticipantFormModalProps {
 }
 
 interface ParticipantData {
+  customer_id: number | null;
   name: string;
   phone: string;
   email: string;
@@ -34,6 +35,7 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   const [customers, setCustomers] = useState<Array<{id: number, name: string, phone: string, email: string}>>([]);
   
   const [formData, setFormData] = useState<ParticipantData>({
+    customer_id: null,
     name: '',
     phone: '',
     email: '',
@@ -84,7 +86,7 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   // 选择客户
   const handleSelectCustomer = (customerId: string) => {
     if (!customerId) {
-      setFormData(prev => ({ ...prev, name: '', phone: '', email: '' }));
+      setFormData(prev => ({ ...prev, customer_id: null, name: '', phone: '', email: '' }));
       return;
     }
     
@@ -92,6 +94,7 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
     if (customer) {
       setFormData(prev => ({
         ...prev,
+        customer_id: customer.id,
         name: customer.name,
         phone: customer.phone || '',
         email: customer.email || ''
@@ -150,6 +153,7 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
       // 构建参训者数据
       const participantData = {
         training_session_id: session.id,
+        customer_id: formData.customer_id, // 添加customer_id用于RLS策略判断
         name: formData.name,
         phone: formData.phone,
         email: formData.email || null,

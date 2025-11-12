@@ -2395,7 +2395,7 @@ export default function TrainingPerformance() {
                                     )}
                                   </div>
                                 </div>
-                                {(user?.role === 'admin' || user?.role === 'salesperson') && (
+                                <PermissionGuard permission="prospectus_download">
                                   <button
                                     onClick={async () => {
                                       const loadingToast = toast.loading('正在准备下载...');
@@ -2439,12 +2439,7 @@ export default function TrainingPerformance() {
                                     <i className="fas fa-download"></i>
                                     下载简章{prospectus.has_sealed_version && '（盖章版）'}
                                   </button>
-                                )}
-                                {user?.role !== 'admin' && user?.role !== 'salesperson' && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                                    专家角色仅可查看，无下载权限
-                                  </div>
-                                )}
+                                </PermissionGuard>
                               </>
                             );
                           })()}
@@ -2537,8 +2532,13 @@ export default function TrainingPerformance() {
                           </thead>
                           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             {selectedSession.participantsList.map((participant) => {
-                              // 业务员只能删除自己的客户，管理员可以删除所有客户
-                              const canDelete = user?.role === 'admin' || participant.salespersonName === user?.name;
+                              // 权限判断：
+                              // - 管理员可以删除所有参与者
+                              // - 业务员只能删除自己的客户
+                              // - 部门经理可以删除本部门业务员的客户
+                              const canDelete = user?.role === 'admin' || 
+                                participant.salespersonName === user?.name ||
+                                (user?.role === 'manager' && (participant as any).salespersonDepartment === user?.department);
                               
                               return (
                                 <tr key={participant.id}>
