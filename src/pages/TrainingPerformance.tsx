@@ -10,8 +10,10 @@ import { useState, useContext, useEffect } from 'react';
   import ParticipantEditModal from '@/components/ParticipantEditModal';
   import supabaseService from '@/lib/supabase/supabaseService';
   import prospectusService from '@/lib/supabase/prospectusService';
+  import scheduleService from '@/lib/supabase/scheduleService';
+  import { supabase } from '@/lib/supabase/client';
   import trainingSessionService from '@/lib/services/trainingSessionService';
-  import type { TrainingSessionFrontend, Course, Customer, Expert, Prospectus } from '@/lib/supabase/types';
+  import type { TrainingSessionFrontend, Course, Customer, Expert, Prospectus, Schedule } from '@/lib/supabase/types';
   import { toast } from 'sonner';
   import { exportAllAttendanceSheet, exportAttendanceSheetBySalesperson } from '@/lib/exporters/attendanceSheetExporter';
   import { generateDefaultAvatar } from '@/utils/imageUtils';
@@ -37,6 +39,7 @@ export default function TrainingPerformance() {
   const [areas, setAreas] = useState<string[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [prospectuses, setProspectuses] = useState<Prospectus[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<TrainingSessionFrontend | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -140,6 +143,10 @@ export default function TrainingPerformance() {
         // 获取招商简章列表
         const prospectList = await prospectusService.getProspectuses();
         setProspectuses(prospectList);
+        
+        // 获取课表列表
+        const scheduleList = await scheduleService.getSchedules();
+        setSchedules(scheduleList);
       } catch (error) {
         console.error('获取数据失败', error);
         toast.error('获取数据失败，请重试');
@@ -916,6 +923,62 @@ export default function TrainingPerformance() {
     }
   };
 
+  // 重新计算参训者的折扣率（当培训价格变化时）
+  const recalculateParticipantDiscounts = async (
+    trainingSessionId: number, 
+    newOnlinePrice: number, 
+    newOfflinePrice: number
+  ) => {
+    try {
+      // 获取该培训的所有参训者
+      const { data: participants, error } = await supabase
+        .from('training_participants')
+        .select('id, participation_mode, actual_price, payment_amount')
+        .eq('training_session_id', trainingSessionId);
+
+      if (error) throw error;
+
+      if (!participants || participants.length === 0) {
+        console.log('📋 没有参训者需要更新折扣率');
+        return;
+      }
+
+      // 为每个参训者重新计算折扣率
+      const updates = participants.map((participant: any) => {
+        // 获取对应的标准价格
+        const standardPrice = participant.participation_mode === 'online' ? newOnlinePrice : newOfflinePrice;
+        
+        // 使用实际支付价格计算折扣率
+        const actualPrice = participant.actual_price || participant.payment_amount || 0;
+        const newDiscountRate = standardPrice > 0 ? Math.round((1 - actualPrice / standardPrice) * 100) : 0;
+        
+        console.log(`📊 重算折扣: ID${participant.id}, 标准价格=${standardPrice}, 实际价格=${actualPrice}, 折扣率=${newDiscountRate}%`);
+        
+        return {
+          id: participant.id,
+          discount_rate: Math.max(0, Math.min(100, newDiscountRate)) // 限制在0-100%之间
+        };
+      });
+
+      // 批量更新折扣率
+      for (const update of updates) {
+        const { error: updateError } = await supabase
+          .from('training_participants')
+          .update({ discount_rate: update.discount_rate } as any)
+          .eq('id', update.id);
+
+        if (updateError) {
+          console.error(`更新参训者 ${update.id} 折扣率失败:`, updateError);
+        }
+      }
+
+      console.log(`✅ 成功更新 ${updates.length} 个参训者的折扣率`);
+    } catch (error: any) {
+      console.error('重新计算折扣率失败:', error);
+      toast.error('更新折扣率失败，但培训信息已保存');
+    }
+  };
+
   // 提交编辑培训
   const handleEditTrainingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1028,6 +1091,7 @@ export default function TrainingPerformance() {
         course_description: courseDescription || null,
         salesperson_id: salespersonId || null,
         prospectus_id: prospectusId ? parseInt(prospectusId) : null,
+        schedule_id: editSession.scheduleId || null, // 保持原有的课表关联
         training_mode: trainingMode,
         online_price: onlinePrice,
         offline_price: offlinePrice
@@ -1039,6 +1103,12 @@ export default function TrainingPerformance() {
       await supabaseService.updateTrainingSession(editSession.id, updateData);
       
       console.log('✅ 数据库更新成功');
+      
+      // 如果价格发生变化，重新计算参训者的折扣率
+      if (onlinePrice !== (editSession as any).online_price || offlinePrice !== (editSession as any).offline_price) {
+        console.log('💰 价格发生变化，重新计算折扣率...');
+        await recalculateParticipantDiscounts(editSession.id, onlinePrice, offlinePrice);
+      }
       
       // 刷新数据（业务员只加载自己的客户）
       const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
@@ -1179,6 +1249,7 @@ export default function TrainingPerformance() {
         session_number: 1,      // 新增字段，默认第1期
         course_description: null,
         prospectus_id: prospectusId ? parseInt(prospectusId) : null,
+        schedule_id: null, // 课表ID，暂时为null
         training_mode: trainingMode,
         online_price: onlinePrice,
         offline_price: offlinePrice,
@@ -2252,7 +2323,7 @@ export default function TrainingPerformance() {
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">培训模式</label>
                      <select
                        name="trainingMode"
-                       defaultValue={(editSession as any).trainingMode || 'offline'}
+                       defaultValue={editSession.training_mode || 'offline'}
                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                      >
                        <option value="online">纯线上</option>
@@ -2265,7 +2336,7 @@ export default function TrainingPerformance() {
                      <input
                        type="number"
                        name="onlinePrice"
-                       defaultValue={(editSession as any).onlinePrice || 0}
+                       defaultValue={editSession.online_price || ''}
                        min={0}
                        step="0.01"
                        placeholder="例如：1980.00"
@@ -2277,7 +2348,7 @@ export default function TrainingPerformance() {
                      <input
                        type="number"
                        name="offlinePrice"
-                       defaultValue={(editSession as any).offlinePrice || 0}
+                       defaultValue={editSession.offline_price || ''}
                        min={0}
                        step="0.01"
                        placeholder="例如：2980.00"
@@ -2552,12 +2623,13 @@ export default function TrainingPerformance() {
                       </div>
                     </div>
 
-                    {/* 招商简章区域 */}
+                    {/* 资料下载区域 */}
                     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                      <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-3">招商简章</h4>
-                      {selectedSession.prospectusId ? (
-                        <div className="space-y-3">
-                          {(() => {
+                      <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-3">资料下载</h4>
+                      <div className="space-y-3">
+                        {/* 招商简章下载 */}
+                        {selectedSession.prospectusId ? (
+                          (() => {
                             const prospectus = prospectuses.find(p => p.id === selectedSession.prospectusId);
                             if (!prospectus) {
                               return (
@@ -2566,85 +2638,178 @@ export default function TrainingPerformance() {
                                 </div>
                               );
                             }
+                            
+                            // 下载函数
+                            const handleDownload = async (preferSealed: boolean, versionName: string) => {
+                              const loadingToast = toast.loading('正在准备下载...');
+                              try {
+                                const url = await prospectusService.downloadProspectus(
+                                  prospectus.id,
+                                  preferSealed,
+                                  selectedSession.id
+                                );
+                                
+                                // 使用 fetch 获取文件内容，然后创建 Blob URL 强制下载
+                                const response = await fetch(url);
+                                if (!response.ok) {
+                                  throw new Error('下载文件失败');
+                                }
+                                
+                                const blob = await response.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                
+                                // 创建隐藏的 a 标签触发下载
+                                const link = document.createElement('a');
+                                link.href = blobUrl;
+                                link.download = prospectus.name + (preferSealed && prospectus.has_sealed_version ? '（盖章版）' : '') + '.pdf';
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                
+                                // 清理
+                                document.body.removeChild(link);
+                                setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+                                
+                                toast.dismiss(loadingToast);
+                                toast.success(`${versionName}下载成功`);
+                              } catch (error: any) {
+                                toast.dismiss(loadingToast);
+                                toast.error(error.message || '下载失败');
+                              }
+                            };
+                            
                             return (
                               <>
-                                <div className="flex items-start justify-between">
+                                <div className="flex items-start justify-between mb-2">
                                   <div className="flex-1">
                                     <div className="text-sm font-medium text-gray-800 dark:text-white flex items-center">
                                       {prospectus.name}
                                       {prospectus.has_sealed_version && (
                                         <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded-full">
-                                          已盖章
+                                          有盖章版本
                                         </span>
                                       )}
                                     </div>
-                                    {prospectus.type && (
-                                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        类型: {prospectus.type}
-                                      </div>
-                                    )}
-                                    {prospectus.description && (
-                                      <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                                        {prospectus.description}
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                                 <PermissionGuard permission="prospectus_download">
+                                  <div className="space-y-2">
+                                    {/* 未盖章版本下载按钮 */}
+                                    <button
+                                      onClick={() => handleDownload(false, '未盖章版本')}
+                                      className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                      <i className="fas fa-download"></i>
+                                      下载招商简章
+                                    </button>
+                                    
+                                    {/* 盖章版本下载按钮 - 仅在有盖章版本时显示 */}
+                                    {prospectus.has_sealed_version && (
+                                      <button
+                                        onClick={() => handleDownload(true, '盖章版本')}
+                                        className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+                                      >
+                                        <i className="fas fa-download"></i>
+                                        下载招商简章（盖章版）
+                                      </button>
+                                    )}
+                                  </div>
+                                </PermissionGuard>
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                            暂无关联招商简章
+                          </div>
+                        )}
+                        
+                        {/* 课表下载 */}
+                        {selectedSession.scheduleId ? (
+                          (() => {
+                            const schedule = schedules.find(s => s.id === selectedSession.scheduleId);
+                            if (!schedule) {
+                              return (
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  课表信息加载失败
+                                </div>
+                              );
+                            }
+                            
+                            // 课表下载函数
+                            const handleScheduleDownload = async () => {
+                              const loadingToast = toast.loading('正在准备下载...');
+                              try {
+                                const url = await scheduleService.downloadSchedule(
+                                  schedule.id,
+                                  selectedSession.id
+                                );
+                                
+                                // 使用 fetch 获取文件内容，然后创建 Blob URL 强制下载
+                                const response = await fetch(url);
+                                if (!response.ok) {
+                                  throw new Error('下载文件失败');
+                                }
+                                
+                                const blob = await response.blob();
+                                const blobUrl = URL.createObjectURL(blob);
+                                
+                                // 创建隐藏的 a 标签触发下载
+                                const link = document.createElement('a');
+                                link.href = blobUrl;
+                                link.download = schedule.name + '.pdf';
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                
+                                // 清理
+                                document.body.removeChild(link);
+                                setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+                                
+                                toast.dismiss(loadingToast);
+                                toast.success('课表下载成功');
+                              } catch (error: any) {
+                                toast.dismiss(loadingToast);
+                                toast.error(error.message || '下载失败');
+                              }
+                            };
+                            
+                            return (
+                              <>
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium text-gray-800 dark:text-white flex items-center">
+                                      {schedule.name}
+                                    </div>
+                                  </div>
+                                </div>
+                                <PermissionGuard permission="schedule_download">
                                   <button
-                                    onClick={async () => {
-                                      const loadingToast = toast.loading('正在准备下载...');
-                                      try {
-                                        const url = await prospectusService.downloadProspectus(
-                                          prospectus.id,
-                                          true,
-                                          selectedSession.id
-                                        );
-                                        
-                                        // 使用 fetch 获取文件内容，然后创建 Blob URL 强制下载
-                                        const response = await fetch(url);
-                                        if (!response.ok) {
-                                          throw new Error('下载文件失败');
-                                        }
-                                        
-                                        const blob = await response.blob();
-                                        const blobUrl = URL.createObjectURL(blob);
-                                        
-                                        // 创建隐藏的 a 标签触发下载
-                                        const link = document.createElement('a');
-                                        link.href = blobUrl;
-                                        link.download = prospectus.name + '.pdf';
-                                        link.style.display = 'none';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        
-                                        // 清理
-                                        document.body.removeChild(link);
-                                        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-                                        
-                                        toast.dismiss(loadingToast);
-                                        toast.success('简章下载成功');
-                                      } catch (error: any) {
-                                        toast.dismiss(loadingToast);
-                                        toast.error(error.message || '下载失败');
-                                      }
-                                    }}
-                                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    onClick={handleScheduleDownload}
+                                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
                                   >
                                     <i className="fas fa-download"></i>
-                                    下载简章{prospectus.has_sealed_version && '（盖章版）'}
+                                    下载课表
                                   </button>
                                 </PermissionGuard>
                               </>
                             );
-                          })()}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
-                          暂无关联招商简章
-                        </div>
-                      )}
+                          })()
+                        ) : (
+                          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                            暂无关联课表
+                          </div>
+                        )}
+                        
+                        {/* 当既没有简章也没有课表时显示 */}
+                        {!selectedSession.prospectusId && !selectedSession.scheduleId && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                            暂无关联资料
+                          </div>
+                        )}
+                      </div>
                     </div>
+
                   </div>
                 )}
 
@@ -2788,7 +2953,7 @@ export default function TrainingPerformance() {
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                                     {(() => {
-                                      const discountRate = (participant as any).discountRate || 0;
+                                      const discountRate = participant.discountRate || 0;
                                       if (discountRate > 0) {
                                         return (
                                           <span className="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300">

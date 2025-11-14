@@ -15,6 +15,7 @@ import NotificationCenter from "@/pages/NotificationCenter";
 import AnnouncementList from "@/pages/AnnouncementList";
 import PosterGenerator from "@/pages/PosterGenerator";
 import ProspectusManagement from '@/pages/ProspectusManagement';
+import ScheduleManagement from '@/pages/ScheduleManagement';
 import InitDepartmentManager from '@/pages/InitDepartmentManager';
 import CourseManagement from '@/pages/CourseManagement';
 import AuditLogs from '@/pages/AuditLogs';
@@ -491,6 +492,11 @@ export default function App() {
         <Route path="/prospectus-management" element={
           <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
             <ProspectusManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/schedule-management" element={
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
+            <ScheduleManagement />
           </ProtectedRoute>
         } />
         <Route path="/init-department-manager" element={

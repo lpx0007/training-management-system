@@ -65,6 +65,44 @@ export interface ProspectusDownload {
   created_at: string;
 }
 
+// 课表
+export interface Schedule {
+  id: number;
+  name: string;
+  type: string | null;
+  description: string | null;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  uploaded_by: string | null;
+  uploaded_at: string;
+  updated_at: string;
+  status: 'active' | 'inactive' | 'error';
+  download_count: number;
+  created_at: string;
+}
+
+// 课表下载记录
+export interface ScheduleDownload {
+  id: number;
+  schedule_id: number;
+  user_id: string;
+  user_name: string;
+  downloaded_at: string;
+  training_session_id: number | null;
+  training_session_name?: string | null;  // 关联的培训名称
+  created_at: string;
+}
+
+// 课表与课程关联
+export interface ScheduleCourse {
+  id: number;
+  schedule_id: number;
+  course_id: number;
+  created_at: string;
+  created_by: string | null;
+}
+
 // 客户（数据库字段）
 export interface Customer {
   id: number;
@@ -81,7 +119,7 @@ export interface Customer {
   follow_up_status: string | null;
   created_at: string;
   last_contact: string | null;
-  tags: string[] | null;
+  tags: string | null;
   department: string | null; // 部门
   gender: string; // 性别（必填）
   accommodation_requirements: string | null; // 住宿需求
@@ -225,6 +263,7 @@ export interface TrainingSession {
   session_number: number | null;   // 第几期
   course_description: string | null;
   prospectus_id: number | null;  // 招商简章ID
+  schedule_id: number | null;    // 课表ID
   training_mode: string | null;  // 培训模式：online/offline/mixed
   online_price: number | null;   // 线上价格
   offline_price: number | null;  // 线下价格
@@ -238,7 +277,7 @@ export interface TrainingSession {
 }
 
 // 培训场次（前端友好类型，包含驼峰命名字段）
-export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_name' | 'session_number' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id' | 'deleted_at' | 'deleted_by' | 'deleted_by_name' | 'delete_reason'> {
+export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_name' | 'session_number' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id' | 'schedule_id' | 'deleted_at' | 'deleted_by' | 'deleted_by_name' | 'delete_reason'> {
   expertId: number | null;
   expert: string;
   endDate: string | null;
@@ -250,6 +289,7 @@ export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_i
   sessionNumber: number;          // 第几期
   courseDescription: string | null;
   prospectusId: number | null;  // 招商简章ID
+  scheduleId: number | null;    // 课表ID
   createdAt: string;
   // 软删除字段（驼峰命名）
   deletedAt: string | null;
@@ -363,6 +403,7 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     sessionNumber: dbSession.session_number || 1,  // 新增
     courseDescription: dbSession.course_description,
     prospectusId: dbSession.prospectus_id,
+    scheduleId: dbSession.schedule_id || null,
     training_mode: dbSession.training_mode,
     online_price: dbSession.online_price,
     offline_price: dbSession.offline_price,
@@ -513,6 +554,21 @@ export interface Database {
       prospectus_downloads: {
         Row: ProspectusDownload;
         Insert: Omit<ProspectusDownload, 'id' | 'created_at' | 'downloaded_at'>;
+        Update: never;
+      };
+      schedules: {
+        Row: Schedule;
+        Insert: Omit<Schedule, 'id' | 'created_at' | 'updated_at' | 'uploaded_at'>;
+        Update: Partial<Omit<Schedule, 'id' | 'created_at' | 'uploaded_at'>>;
+      };
+      schedule_downloads: {
+        Row: ScheduleDownload;
+        Insert: Omit<ScheduleDownload, 'id' | 'created_at' | 'downloaded_at'>;
+        Update: never;
+      };
+      schedule_courses: {
+        Row: ScheduleCourse;
+        Insert: Omit<ScheduleCourse, 'id' | 'created_at'>;
         Update: never;
       };
     };

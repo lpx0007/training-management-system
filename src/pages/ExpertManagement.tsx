@@ -379,6 +379,9 @@ export default function ExpertManagement() {
 
   // 领域列表
   const fields = ['全部', ...Array.from(new Set(experts.map(expert => expert.field).filter((f): f is string => Boolean(f))))];
+  
+  // 为筛选器显示修正文本
+  const getFieldDisplayText = (field: string) => field === '全部' ? '筛选领域' : field;
 
   // 计算统计数据
   const totalExperts = filteredExperts.length;
@@ -645,7 +648,7 @@ export default function ExpertManagement() {
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
                   {fields.map(field => (
-                    <option key={field} value={field}>{field}</option>
+                    <option key={field} value={field}>{getFieldDisplayText(field)}</option>
                   ))}
                 </select>
                 
@@ -655,7 +658,7 @@ export default function ExpertManagement() {
                   onChange={(e) => setSelectedExperience(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
-                  <option value="全部">全部经验</option>
+                  <option value="全部">筛选经验</option>
                   <option value="5年以下">5年以下</option>
                   <option value="5-10年">5-10年</option>
                   <option value="10-15年">10-15年</option>
@@ -668,7 +671,7 @@ export default function ExpertManagement() {
                   onChange={(e) => setSelectedAvailability(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
-                  <option value="全部">全部状态</option>
+                  <option value="全部">筛选状态</option>
                   <option value="可预约">可预约</option>
                   <option value="不可预约">不可预约</option>
                 </select>

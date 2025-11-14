@@ -91,13 +91,22 @@ export const MENU_FEATURES: MenuFeature[] = [
     displayOrder: 8
   },
   {
+    id: 'schedule_management',
+    name: '课表管理',
+    path: '/schedule-management',
+    icon: 'calendar',
+    description: '管理课表文件',
+    requiredPermissions: ['schedule_view'],
+    displayOrder: 9
+  },
+  {
     id: 'poster_generator',
     name: '海报生成',
     path: '/poster-generator',
     icon: 'image',
     description: '生成培训宣传海报',
     requiredPermissions: ['poster_generate'],
-    displayOrder: 9
+    displayOrder: 10
   },
   {
     id: 'announcement_management',

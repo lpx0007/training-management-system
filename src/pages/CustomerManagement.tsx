@@ -23,10 +23,11 @@ import {
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
 import NotificationBell from '@/components/Notifications/NotificationBell';
-import CustomerImportModal from '@/components/CustomerImportModal';
 import { PermissionGuard } from '@/components/PermissionGuard';
+import CustomerImportModal from '@/components/CustomerImportModal';
 import { toast } from 'sonner';
 import { generateDefaultAvatar } from '@/utils/imageUtils';
+import { CUSTOMER_TAGS, TAG_CONFIG } from '@/constants/customerTags';
 
 import supabaseService from '@/lib/supabase/supabaseService';
 import { supabase } from '@/lib/supabase/client';
@@ -39,8 +40,9 @@ export default function CustomerManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('全部');
   const [selectedArea, setSelectedArea] = useState('全部');
-  const [selectedFollowUpStatus, setSelectedFollowUpStatus] = useState('全部');
+  // const [selectedFollowUpStatus, setSelectedFollowUpStatus] = useState('全部'); // 已移除，使用标签系统替代
   const [selectedSalesperson, setSelectedSalesperson] = useState('全部');
+  const [selectedTag, setSelectedTag] = useState('全部');
   const [selectedDepartment, setSelectedDepartment] = useState('全部');
   const [filteredCustomers, setFilteredCustomers] = useState<CustomerFrontend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,7 +66,7 @@ export default function CustomerManagement() {
     position: '',
     location: '',
     status: '潜在客户',
-    tags: [],
+    tags: null,
     avatar: null,
     department: '',
     gender: '',
@@ -203,9 +205,9 @@ export default function CustomerManagement() {
       filtered = filtered.filter(customer => customer.location === selectedArea);
     }
 
-    // 应用跟进状态筛选
-    if (selectedFollowUpStatus !== '全部') {
-      filtered = filtered.filter(customer => customer.follow_up_status === selectedFollowUpStatus);
+    // 应用标签筛选
+    if (selectedTag !== '全部') {
+      filtered = filtered.filter(customer => customer.tags === selectedTag);
     }
 
     // 应用业务员筛选
@@ -240,7 +242,7 @@ export default function CustomerManagement() {
     // 转换为前端格式并更新客户列表
     const frontendFiltered = filtered.map(convertToFrontend);
     setFilteredCustomers(frontendFiltered);
-  }, [allCustomers, user, searchTerm, selectedStatus, selectedArea, selectedFollowUpStatus, selectedSalesperson, sortConfig]);
+  }, [allCustomers, user, searchTerm, selectedStatus, selectedArea, selectedTag, selectedSalesperson, sortConfig]);
 
   // 处理排序
   const handleSort = (key: string) => {
@@ -444,10 +446,10 @@ export default function CustomerManagement() {
         .from('customer_follow_ups')
         .insert({
           customer_id: selectedCustomer.id.toString(),
-          content: followUpContent.trim(),
-          created_by: user?.id,
+          content: followUpContent,
+          created_by: user?.name,
           created_at: new Date().toISOString()
-        });
+        } as any);
 
       if (error) throw error;
 
@@ -669,7 +671,7 @@ export default function CustomerManagement() {
         salesperson_name: salespersonName,
         follow_up_status: '待跟进',
         last_contact: new Date().toISOString().split('T')[0],
-        tags: (newCustomerData.tags as string[]) || [],
+        tags: newCustomerData.tags || null,
         avatar: null,
         department: newCustomerData.department || null,
         gender: newCustomerData.gender || '',
@@ -712,9 +714,7 @@ export default function CustomerManagement() {
         if (selectedArea !== '全部') {
           newFiltered = newFiltered.filter(c => c.location === selectedArea);
         }
-        if (selectedFollowUpStatus !== '全部') {
-          newFiltered = newFiltered.filter(c => c.follow_up_status === selectedFollowUpStatus);
-        }
+        // 跟进状态筛选已移除，使用标签筛选替代
         if (selectedSalesperson !== '全部') {
           if (selectedSalesperson === '未分配') {
             newFiltered = newFiltered.filter(c => !c.salesperson_id);
@@ -736,7 +736,7 @@ export default function CustomerManagement() {
           position: '',
           location: '',
           status: '潜在客户',
-          tags: [],
+          tags: null,
           avatar: null
         });
 
@@ -1017,19 +1017,15 @@ export default function CustomerManagement() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">客户标签</label>
                       <div className="flex flex-wrap gap-2">
-                        {['重要客户', '潜在客户', '高价值客户', '技术类', '管理类', '营销类', '设计类'].map((tag) => (
+                        {CUSTOMER_TAGS.map((tag) => (
                           <label key={tag} className="inline-flex items-center cursor-pointer">
                             <input
-                              type="checkbox"
+                              type="radio"
+                              name="customerTag"
                               className="sr-only peer"
-                              checked={(editCustomerData.tags as string[] || []).includes(tag)}
-                              onChange={(e) => {
-                                const currentTags = editCustomerData.tags as string[] || [];
-                                if (e.target.checked) {
-                                  setEditCustomerData({ ...editCustomerData, tags: [...currentTags, tag] });
-                                } else {
-                                  setEditCustomerData({ ...editCustomerData, tags: currentTags.filter(t => t !== tag) });
-                                }
+                              checked={editCustomerData.tags === tag}
+                              onChange={() => {
+                                setEditCustomerData({ ...editCustomerData, tags: tag });
                               }}
                             />
                             <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
@@ -1235,11 +1231,10 @@ export default function CustomerManagement() {
                   onChange={(e) => setSelectedStatus(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
-                  <option value="全部">全部状态</option>
+                  <option value="全部">筛选状态</option>
                   <option value="已成交">已成交</option>
                   <option value="跟进中">跟进中</option>
                   <option value="潜在客户">潜在客户</option>
-                  <option value="已流失">已流失</option>
                 </select>
 
                 {/* 区域筛选 */}
@@ -1248,24 +1243,25 @@ export default function CustomerManagement() {
                   onChange={(e) => setSelectedArea(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
-                  <option value="全部">全部地区</option>
+                  <option value="全部">筛选地区</option>
                   <option value="北京">北京</option>
                   <option value="上海">上海</option>
                   <option value="广州">广州</option>
                   <option value="深圳">深圳</option>
+                  <option value="杭州">杭州</option>
                   <option value="其他">其他</option>
                 </select>
 
-                {/* 跟进状态筛选 */}
+                {/* 标签筛选 */}
                 <select
-                  value={selectedFollowUpStatus}
-                  onChange={(e) => setSelectedFollowUpStatus(e.target.value)}
+                  value={selectedTag}
+                  onChange={(e) => setSelectedTag(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
-                  <option value="全部">全部跟进</option>
-                  <option value="已完成">已完成</option>
-                  <option value="进行中">进行中</option>
-                  <option value="待跟进">待跟进</option>
+                  <option value="全部">筛选标签</option>
+                  {CUSTOMER_TAGS.map((tag) => (
+                    <option key={tag} value={tag}>{tag}</option>
+                  ))}
                 </select>
 
                 {/* 部门筛选 - 部门经理可见 */}
@@ -1403,11 +1399,13 @@ export default function CustomerManagement() {
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-800 dark:text-white">{customer.name}</div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {(customer.tags || []).map((tag, index) => (
-                                  <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 mr-1">
-                                    {tag}
+                                {customer.tags ? (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mr-1 ${TAG_CONFIG[customer.tags as keyof typeof TAG_CONFIG]?.color || 'bg-gray-100 text-gray-800'}`}>
+                                    {customer.tags}
                                   </span>
-                                ))}
+                                ) : (
+                                  <span className="text-gray-400">无标签</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1572,11 +1570,15 @@ export default function CustomerManagement() {
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{selectedCustomer.name}</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {(selectedCustomer.tags || []).map((tag, index) => (
-                      <span key={index} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-sm rounded-full">
-                        {tag}
+                    {selectedCustomer.tags ? (
+                      <span className={`px-3 py-1 text-sm rounded-full ${TAG_CONFIG[selectedCustomer.tags as keyof typeof TAG_CONFIG]?.color || 'bg-gray-50 text-gray-600'}`}>
+                        {selectedCustomer.tags}
                       </span>
-                    ))}
+                    ) : (
+                      <span className="px-3 py-1 bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400 text-sm rounded-full">
+                        无标签
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -1879,19 +1881,15 @@ export default function CustomerManagement() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">客户标签</label>
                   <div className="flex flex-wrap gap-2">
-                    {['重要客户', '潜在客户', '高价值客户', '技术类', '管理类', '营销类', '设计类'].map((tag) => (
+                    {CUSTOMER_TAGS.map((tag) => (
                       <label key={tag} className="inline-flex items-center cursor-pointer">
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name="newCustomerTag"
                           className="sr-only peer"
-                          checked={(newCustomerData.tags as string[] || []).includes(tag)}
-                          onChange={(e) => {
-                            const currentTags = newCustomerData.tags as string[] || [];
-                            if (e.target.checked) {
-                              setNewCustomerData({ ...newCustomerData, tags: [...currentTags, tag] });
-                            } else {
-                              setNewCustomerData({ ...newCustomerData, tags: currentTags.filter(t => t !== tag) });
-                            }
+                          checked={newCustomerData.tags === tag}
+                          onChange={() => {
+                            setNewCustomerData({ ...newCustomerData, tags: tag });
                           }}
                         />
                         <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>

@@ -596,6 +596,10 @@ export default function SalesPersonManagement() {
   // 团队列表
   const teams = ['全部', ...Array.from(new Set(salespersons.map(s => s.team).filter((t): t is string => Boolean(t))))];
 
+  // 为筛选器显示修正文本
+  const getDepartmentDisplayText = (dept: string) => dept === '全部' ? '筛选部门' : dept;
+  const getTeamDisplayText = (team: string) => team === '全部' ? '筛选团队' : team;
+
   // 计算统计数据
   const totalSalespersons = filteredSalespersons.length;
   const activeSalespersons = filteredSalespersons.filter(salesperson => salesperson.status === 'enabled' && salesperson.work_status === 'active').length;
@@ -875,7 +879,7 @@ export default function SalesPersonManagement() {
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
                   {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                    <option key={dept} value={dept}>{getDepartmentDisplayText(dept)}</option>
                   ))}
                 </select>
                 
@@ -886,7 +890,7 @@ export default function SalesPersonManagement() {
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
                   {teams.map(team => (
-                    <option key={team} value={team}>{team}</option>
+                    <option key={team} value={team}>{getTeamDisplayText(team)}</option>
                   ))}
                 </select>
                 
@@ -896,7 +900,7 @@ export default function SalesPersonManagement() {
                   onChange={(e) => setSelectedStatus(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
-                  <option value="全部">全部状态</option>
+                  <option value="全部">筛选状态</option>
                   <option value="待审核">待审核</option>
                   <option value="在职">在职</option>
                   <option value="试用期">试用期</option>

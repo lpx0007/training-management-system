@@ -118,6 +118,20 @@ export default function ProspectusManagement() {
   // 获取唯一的类型列表
   const types = ['全部', ...Array.from(new Set(allProspectuses.map(p => p.type).filter((t): t is string => Boolean(t))))];
   const statuses = ['全部', 'active', 'inactive', 'error'];
+  
+  // 为筛选器显示修正文本
+  const getTypeDisplayText = (type: string) => {
+    if (type === '全部') return '筛选类型';
+    return type || '未分类';
+  };
+  
+  const getStatusDisplayText = (status: string) => {
+    if (status === '全部') return '筛选状态';
+    if (status === 'active') return '正常';
+    if (status === 'inactive') return '停用';
+    if (status === 'error') return '异常';
+    return status;
+  };
 
   // 打开上传模态框
   const openUploadModal = () => {
@@ -270,7 +284,7 @@ export default function ProspectusManagement() {
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 >
                   {types.map(type => (
-                    <option key={type} value={type}>{type || '未分类'}</option>
+                    <option key={type} value={type}>{getTypeDisplayText(type)}</option>
                   ))}
                 </select>
 
@@ -282,7 +296,7 @@ export default function ProspectusManagement() {
                 >
                   {statuses.map(status => (
                     <option key={status} value={status}>
-                      {status === '全部' ? '全部状态' : status === 'active' ? '正常' : status === 'inactive' ? '停用' : '异常'}
+                      {getStatusDisplayText(status)}
                     </option>
                   ))}
                 </select>
@@ -1590,7 +1604,7 @@ function AdaptCoursesModal({ isOpen, prospectus, onClose, onSuccess }: AdaptCour
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               >
-                <option value="全部">全部状态</option>
+                <option value="全部">筛选状态</option>
                 <option value="upcoming">即将开始</option>
                 <option value="ongoing">进行中</option>
                 <option value="completed">已完成</option>

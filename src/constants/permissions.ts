@@ -87,6 +87,19 @@ export const PERMISSION_CATEGORIES: Record<string, PermissionCategory> = {
       { id: 'prospectus_manage_category', name: '管理简章分类', description: '管理简章分类' },
     ]
   },
+  SCHEDULE: {
+    id: 'schedule',
+    name: '课表管理',
+    description: '课表的上传、下载和管理权限',
+    permissions: [
+      { id: 'schedule_view', name: '查看课表', description: '查看课表列表' },
+      { id: 'schedule_upload', name: '上传课表', description: '上传新的课表' },
+      { id: 'schedule_edit', name: '编辑课表', description: '编辑课表信息' },
+      { id: 'schedule_delete', name: '删除课表', description: '删除课表文件' },
+      { id: 'schedule_download', name: '下载课表', description: '下载课表文件' },
+      { id: 'schedule_manage_category', name: '管理课表分类', description: '管理课表分类' },
+    ]
+  },
   POSTER: {
     id: 'poster',
     name: '海报生成',
