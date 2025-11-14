@@ -45,6 +45,7 @@ export const PERMISSION_CATEGORIES: Record<string, PermissionCategory> = {
       { id: 'training_add_participant', name: '添加培训参与者', description: '向培训中添加参与者' },
       { id: 'training_manage_participant', name: '管理培训参与者', description: '管理培训参与者信息' },
       { id: 'training_view_stats', name: '查看培训统计', description: '查看培训统计数据' },
+      { id: 'training_export_participants', name: '导出参训人员', description: '导出培训场次的参训人员名单（含详细信息）' },
     ]
   },
   EXPERT: {
@@ -188,6 +189,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'training_manage_participant',  // 管理培训参与者
     'training_view_stats',
     'training_export',
+    'training_export_participants', // 导出参训人员
     // 业务员管理
     'salesperson_view',
     'salesperson_add',

@@ -34,6 +34,7 @@ import {
   getTrainingCoursesByTimeRange,
   getAvailableYears
 } from '@/lib/services/trainingCourseService';
+import trainingSessionService from '@/lib/supabase/supabaseService';
 
 export default function SalesTracking() {
   const { user } = useContext(AuthContext);
@@ -43,7 +44,7 @@ export default function SalesTracking() {
   const [selectedDepartment] = useState('全部'); // 未使用的筛选功能，保留以避免useEffect报错
   const [selectedTimeRange, setSelectedTimeRange] = useState('本月');
   const [selectedCourse] = useState('全部'); // 未使用的课程筛选，保留以避免useEffect报错
-  const [activeTab, setActiveTab] = useState<'ranking' | 'detail'>('ranking'); // Tab切换
+  const [activeTab, setActiveTab] = useState<'ranking' | 'detail' | 'department'>('ranking'); // Tab切换
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set()); // 展开的课程
   const [expandedDetailCourses, setExpandedDetailCourses] = useState<Set<string>>(new Set()); // 详情框中展开的课程
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'revenue', direction: 'desc' });
@@ -81,6 +82,11 @@ export default function SalesTracking() {
   const [courseDetails, setCourseDetails] = useState<any[]>([]);
   const [topPerformers, setTopPerformers] = useState<any>(null);
   const [growthRate, setGrowthRate] = useState(0);
+
+  // 部门业绩相关状态
+  const [departmentData, setDepartmentData] = useState<any[]>([]);
+  const [departmentTimeRange, setDepartmentTimeRange] = useState('本月');
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set()); // 展开的部门
   
   // 当部门筛选改变时，更新业务员列表
   useEffect(() => {
@@ -288,6 +294,62 @@ export default function SalesTracking() {
   const openExportModal = () => {
     setIsExportModalOpen(true);
   };
+
+  // 获取部门业绩数据
+  const getDepartmentPerformanceData = async (timeRange: string) => {
+    try {
+      const performanceData = await getMonthlyPerformance(timeRange);
+      
+      // 获取所有业务员（包括没有业绩的），按部门统计总人数
+      const allUsers = await trainingSessionService.getAllUsersWithPermissions();
+      const salespersons = allUsers.filter((u: any) => u.role === 'salesperson');
+      const departmentTotalCount: Record<string, number> = {};
+      salespersons.forEach((person: any) => {
+        const dept = person.department || '未分配';
+        departmentTotalCount[dept] = (departmentTotalCount[dept] || 0) + 1;
+      });
+
+      if (performanceData && performanceData.salesPersonData) {
+        // 按部门分组统计业绩（只统计有业绩的业务员）
+        const departmentStats = performanceData.salesPersonData
+          .filter((person: any) => person.revenue > 0)
+          .reduce((acc: any, person: any) => {
+            const dept = person.department || '未分配';
+            if (!acc[dept]) {
+              acc[dept] = {
+                department: dept,
+                revenue: 0,
+                completedSessions: 0,
+                completedCustomers: 0,
+                participantCount: 0,
+                salespersonCount: departmentTotalCount[dept] || 0, // 使用部门总人数
+                salespersons: []
+              };
+            }
+            acc[dept].revenue += person.revenue || 0;
+            acc[dept].completedSessions += person.completedSessions || 0;
+            acc[dept].completedCustomers += person.completedCustomers || 0;
+            acc[dept].participantCount += person.participantCount || 0;
+            acc[dept].salespersons.push(person);
+            return acc;
+          }, {});
+
+        // 转换为数组并排序
+        const departmentArray = Object.values(departmentStats).sort((a: any, b: any) => b.revenue - a.revenue);
+        setDepartmentData(departmentArray);
+      }
+    } catch (error) {
+      console.error('加载部门业绩数据失败:', error);
+      setDepartmentData([]);
+    }
+  };
+
+  // 监听部门业绩时间范围变化
+  useEffect(() => {
+    if (activeTab === 'department') {
+      getDepartmentPerformanceData(departmentTimeRange);
+    }
+  }, [departmentTimeRange, activeTab]);
 
   // 处理导出报表
   const handleExportReport = async () => {
@@ -609,6 +671,17 @@ export default function SalesTracking() {
                   )}
                 >
                   📋 课程销售明细
+                </button>
+                <button
+                  onClick={() => setActiveTab('department')}
+                  className={cn(
+                    "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                    activeTab === 'department'
+                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-gray-300"
+                  )}
+                >
+                  🏢 部门业绩明细
                 </button>
               </nav>
             </div>
@@ -952,6 +1025,180 @@ export default function SalesTracking() {
           </div>
         )}
 
+        {/* Tab 3: 部门业绩明细 */}
+        {activeTab === 'department' && (
+          <div>
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h3 className="font-semibold text-gray-800 dark:text-white">部门业绩明细</h3>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">时间范围:</label>
+                <select
+                  value={departmentTimeRange}
+                  onChange={(e) => setDepartmentTimeRange(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="本月">本月</option>
+                  <option value="本季度">本季度</option>
+                  <option value="本年">本年</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      排名
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      部门名称
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      业务员数量
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      销售额
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      成交客户数
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      人均业绩
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {departmentData.length > 0 ? (
+                    departmentData.map((dept: any, index: number) => {
+                      const isExpanded = expandedDepartments.has(dept.department);
+                      return (
+                        <Fragment key={dept.department}>
+                          <motion.tr 
+                            whileHover={{ backgroundColor: theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : 'rgba(249, 250, 251, 1)' }}
+                            className="transition-colors"
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                              <div className="flex items-center">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+                                  {index + 1}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                {dept.department}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                              {dept.salespersonCount} 人
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                              ¥{dept.revenue.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                              {dept.completedCustomers}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                              ¥{Math.round(dept.revenue / dept.salespersonCount).toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <button
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedDepartments);
+                                  if (isExpanded) {
+                                    newExpanded.delete(dept.department);
+                                  } else {
+                                    newExpanded.add(dept.department);
+                                  }
+                                  setExpandedDepartments(newExpanded);
+                                }}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors flex items-center gap-1 justify-end"
+                              >
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                {isExpanded ? '收起' : '查看详情'}
+                              </button>
+                            </td>
+                          </motion.tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-900/50">
+                                <div className="text-sm">
+                                  <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">业务员成交明细</h4>
+                                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                    <thead>
+                                      <tr>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">业务员</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">销售额</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">成交客户</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">占比</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                                      {dept.salespersons.map((person: any) => (
+                                        <tr key={person.id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center">
+                                              <div className="w-6 h-6 rounded-full overflow-hidden mr-2">
+                                                <img 
+                                                  src={person.avatar} 
+                                                  alt={person.name}
+                                                  className="w-full h-full object-cover"
+                                                />
+                                              </div>
+                                              <span className="text-gray-900 dark:text-white font-medium">
+                                                {person.name}
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-gray-900 dark:text-white font-semibold">
+                                            ¥{person.revenue.toLocaleString()}
+                                          </td>
+                                          <td className="px-4 py-3 text-gray-900 dark:text-white">
+                                            {person.completedCustomers}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center">
+                                              <span className="text-gray-900 dark:text-white mr-2">
+                                                {((person.revenue / dept.revenue) * 100).toFixed(1)}%
+                                              </span>
+                                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-20">
+                                                <div 
+                                                  className="bg-blue-500 h-2 rounded-full"
+                                                  style={{ width: `${(person.revenue / dept.revenue) * 100}%` }}
+                                                ></div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div className="text-6xl mb-4">📊</div>
+                        <div className="text-lg font-medium mb-2">暂无部门业绩数据</div>
+                        <div className="text-sm">当前时间范围内没有部门业绩数据</div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </div>
         
       </>
@@ -1170,6 +1417,7 @@ export default function SalesTracking() {
           </motion.div>
         </motion.div>
       )}
+
 
       {/* 导出报表模态框 */}
       {isExportModalOpen && (

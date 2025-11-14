@@ -60,7 +60,10 @@ export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
   experts: {
     id: '专家ID',
     name: '专家姓名',
+    phone: '手机号',
+    email: '邮箱',
     title: '职称',
+    gender: '性别',
     field: '专业领域',
     experience: '工作经验',
     rating: '评分',
@@ -70,6 +73,10 @@ export const FIELD_MAPPINGS: Record<DataType, Record<string, string>> = {
     bio: '个人简介',
     past_sessions: '历史授课场次',
     total_participants: '累计参训人数',
+    id_number: '身份证号',
+    bank_card_number: '银行卡号',
+    hourly_rate: '课时费',
+    resume: '简历',
     created_at: '创建时间'
   },
   customers: {

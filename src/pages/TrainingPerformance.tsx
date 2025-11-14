@@ -1,12 +1,13 @@
 import { useState, useContext, useEffect } from 'react';
   import { AuthContext } from '@/contexts/authContext';
   import { useLocation } from 'react-router-dom';
-  import { Calendar, Filter, Search, ChevronDown, Users, MapPin, GraduationCap, Plus, ExternalLink, User, X, Download, Trash2, Phone, Mail, Briefcase, UserPlus, UserCircle } from 'lucide-react';
+  import { Calendar, Filter, Search, ChevronDown, Users, MapPin, GraduationCap, Plus, ExternalLink, User, X, Download, Trash2, Phone, Mail, Briefcase, UserPlus, UserCircle, Menu } from 'lucide-react';
   import { Empty } from '@/components/Empty';
   import Sidebar from '@/components/Sidebar';
-import NotificationBell from '@/components/Notifications/NotificationBell';
+  import NotificationBell from '@/components/Notifications/NotificationBell';
   import { PermissionGuard } from '@/components/PermissionGuard';
   import DeleteSessionDialog from '@/components/DeleteSessionDialog';
+  import ParticipantEditModal from '@/components/ParticipantEditModal';
   import supabaseService from '@/lib/supabase/supabaseService';
   import prospectusService from '@/lib/supabase/prospectusService';
   import trainingSessionService from '@/lib/services/trainingSessionService';
@@ -59,6 +60,9 @@ export default function TrainingPerformance() {
   const [priceInputMode, setPriceInputMode] = useState<'discount' | 'custom'>('discount'); // 价格输入模式
   const [selectedCustomersForBatch, setSelectedCustomersForBatch] = useState<Customer[]>([]); // 批量选择的客户
   const [isBatchMode, setIsBatchMode] = useState(false); // 是否批量模式
+  // 参训人员修改相关状态
+  const [isParticipantEditModalOpen, setIsParticipantEditModalOpen] = useState(false);
+  const [selectedParticipantForEdit, setSelectedParticipantForEdit] = useState<any>(null);
   // 时间线视图状态
   const [timelineRange, setTimelineRange] = useState<'1month' | '3months' | '6months' | '1year' | 'all'>('3months');
 
@@ -616,23 +620,21 @@ export default function TrainingPerformance() {
     }
 
     try {
-      const success = await supabaseService.removeParticipantFromTraining(participantId);
+      await supabaseService.removeParticipantFromTraining(participantId);
+      toast.success(`已移除参训者 ${participantName}`);
       
-      if (success) {
-        toast.success(`已成功移除参训者 ${participantName}`);
-        
-        // 刷新培训列表（业务员只加载自己的客户）
-        const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
-        const sessions = await supabaseService.getTrainingSessions(salespersonName);
-        setAllSessions(sessions);
-        
-        // 刷新详情模态框
-        if (selectedSession) {
+      // 刷新培训详情
+      if (selectedSession) {
+        try {
+          // 重新获取培训详情以更新参训人员列表
           const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
           const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id, salespersonName);
           if (updatedSession) {
             setSelectedSession(updatedSession);
           }
+        } catch (refreshError) {
+          console.error('刷新培训详情失败:', refreshError);
+          // 即使刷新失败，也不影响删除操作的成功提示
         }
       }
     } catch (error) {
@@ -641,8 +643,30 @@ export default function TrainingPerformance() {
     }
   };
 
+  // 打开修改参训人员模态框
+  const handleEditParticipant = (participant: any) => {
+    setSelectedParticipantForEdit(participant);
+    setIsParticipantEditModalOpen(true);
+  };
+
+  // 修改参训人员成功后的回调
+  const handleParticipantEditSuccess = async () => {
+    // 刷新培训详情
+    if (selectedSession) {
+      try {
+        const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
+        const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id, salespersonName);
+        if (updatedSession) {
+          setSelectedSession(updatedSession);
+        }
+      } catch (refreshError) {
+        console.error('刷新培训详情失败:', refreshError);
+      }
+    }
+  };
+
   // 导出签到表
-  const handleExportAttendanceSheet = (type: 'all' | 'bySalesperson') => {
+  const handleExportAttendanceSheet = async (type: 'all' | 'bySalesperson') => {
     if (!selectedSession || !selectedSession.participantsList || selectedSession.participantsList.length === 0) {
       toast.error('没有参训人员数据可导出');
       return;
@@ -655,17 +679,35 @@ export default function TrainingPerformance() {
         exportMenu.classList.add('hidden');
       }
 
+      // 获取每个参训人员的公司信息
+      const participantsWithCompany = await Promise.all(
+        selectedSession.participantsList.map(async (p) => {
+          let company = '';
+          try {
+            const customerId = (p as any).customerId;
+            if (customerId) {
+              const customerData = await supabaseService.getCustomerById(customerId);
+              company = customerData?.company || '';
+            }
+          } catch (error) {
+            console.warn(`获取客户 ${p.name} 的公司信息失败:`, error);
+          }
+          
+          return {
+            name: p.name,
+            salespersonName: p.salespersonName || '未分配',
+            company: company
+          };
+        })
+      );
+
       // 准备导出数据
       const config = {
         courseName: selectedSession.name,
         date: selectedSession.date,
         endDate: selectedSession.endDate || undefined,
         totalParticipants: selectedSession.participantsList.length,
-        participants: selectedSession.participantsList.map(p => ({
-          name: p.name,
-          salespersonName: p.salespersonName || '未分配',
-          phone: p.phone || ''
-        }))
+        participants: participantsWithCompany
       };
 
       // 根据类型导出
@@ -682,7 +724,137 @@ export default function TrainingPerformance() {
     }
   };
 
-  // 处理编辑培训
+  // 导出参训人员详细信息
+  const handleExportParticipantDetails = async () => {
+    if (!selectedSession || !selectedSession.participantsList || selectedSession.participantsList.length === 0) {
+      toast.error('没有参训人员数据可导出');
+      return;
+    }
+
+    try {
+      const XLSX = await import('xlsx');
+      
+      // 获取要导出的参训人员列表
+      let participantsToExport = selectedSession.participantsList;
+      
+      // 如果是部门经理，只导出自己部门业务员的客户
+      if (user?.role === 'manager' && user?.department) {
+        try {
+          // 获取当前用户部门的所有业务员
+          const allUsers = await supabaseService.getAllUsersWithPermissions();
+          const departmentSalespersons = allUsers
+            .filter((u: any) => u.role === 'salesperson' && u.department === user.department)
+            .map((u: any) => u.name);
+          
+          // 过滤只显示本部门业务员的参训人员
+          participantsToExport = selectedSession.participantsList.filter(participant => 
+            participant.salespersonName && departmentSalespersons.includes(participant.salespersonName)
+          );
+        } catch (error) {
+          console.warn('获取部门业务员列表失败，导出所有参训人员:', error);
+        }
+      }
+
+      // 获取客户详细信息
+      const customerDetailsMap = new Map();
+      
+      for (const participant of participantsToExport) {
+        if (participant.customerId) {
+          try {
+            // 从数据库获取完整的客户信息
+            const customer = await supabaseService.getCustomerById(participant.customerId);
+            if (customer) {
+              customerDetailsMap.set(participant.customerId, customer);
+            }
+          } catch (error) {
+            console.warn(`获取客户 ${participant.customerId} 详情失败:`, error);
+          }
+        }
+      }
+
+      // 客户详细信息表头
+      const headers = [
+        '序号', '客户姓名', '手机号', '邮箱', '所在地区', '公司名称', '职位', 
+        '部门', '性别', '住宿需求', '客户标签', '跟进状态', '负责业务员',
+        '报名日期', '付款状态', '参与方式', '标准价格', '实付价格', '折扣率'
+      ];
+
+      // 客户详细数据
+      const participantData = participantsToExport.map((participant, index) => {
+        const customer = participant.customerId ? customerDetailsMap.get(participant.customerId) : null;
+        
+        return [
+          index + 1,
+          customer?.name || participant.name || '',
+          customer?.phone || participant.phone || '',
+          customer?.email || participant.email || '',
+          customer?.location || '',
+          customer?.company || '',
+          customer?.position || '',
+          customer?.department || '',
+          customer?.gender || '',
+          customer?.accommodation_requirements || '',
+          Array.isArray(customer?.tags) ? customer.tags.join(', ') : (customer?.tags || ''),
+          customer?.follow_up_status || '',
+          customer?.salesperson_name || participant.salespersonName || '未分配',
+          participant.registrationDate ? new Date(participant.registrationDate).toLocaleDateString('zh-CN') : '',
+          participant.paymentStatus || '',
+          participant.participationMode === 'online' ? '线上参与' : participant.participationMode === 'offline' ? '线下参与' : '未设定',
+          participant.paymentAmount ? `¥${participant.paymentAmount.toLocaleString()}` : '',
+          participant.actualPrice ? `¥${participant.actualPrice.toLocaleString()}` : (participant.paymentAmount ? `¥${participant.paymentAmount.toLocaleString()}` : ''),
+          participant.discountRate ? `${participant.discountRate}%` : ''
+        ];
+      });
+
+      // 组织导出数据 - 只包含客户信息
+      const allData = [
+        headers,
+        ...participantData
+      ];
+
+      // 创建工作表
+      const ws = XLSX.utils.aoa_to_sheet(allData);
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 6 },  // 序号
+        { wch: 12 }, // 客户姓名
+        { wch: 15 }, // 手机号
+        { wch: 25 }, // 邮箱
+        { wch: 10 }, // 所在地区
+        { wch: 20 }, // 公司名称
+        { wch: 12 }, // 职位
+        { wch: 12 }, // 部门
+        { wch: 6 },  // 性别
+        { wch: 30 }, // 住宿需求
+        { wch: 20 }, // 客户标签
+        { wch: 10 }, // 跟进状态
+        { wch: 12 }, // 负责业务员
+        { wch: 12 }, // 报名日期
+        { wch: 10 }, // 付款状态
+        { wch: 10 }, // 参与方式
+        { wch: 12 }, // 标准价格
+        { wch: 12 }, // 实付价格
+        { wch: 8 }   // 折扣率
+      ];
+      ws['!cols'] = colWidths;
+
+      // 创建工作簿
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '客户详细信息');
+
+      // 导出文件
+      const fileName = `${selectedSession.name}_客户详细信息_${new Date().toLocaleDateString('zh-CN')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast.success(`成功导出 ${participantsToExport.length} 名客户详细信息`);
+    } catch (error) {
+      console.error('❌ 导出客户详细信息失败:', error);
+      toast.error('导出客户详细信息失败，请重试');
+    }
+  };
+
+  // 处理编辑培训场次
   const handleEditTraining = (session: TrainingSessionFrontend) => {
     setEditSession(session);
     setIsEditModalOpen(true);
@@ -1108,6 +1280,15 @@ export default function TrainingPerformance() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* 移动端遮罩层 */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-0 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* 使用统一的Sidebar组件 */}
       <Sidebar 
         sidebarOpen={sidebarOpen} 
@@ -2173,6 +2354,20 @@ export default function TrainingPerformance() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">培训详情</h2>
                 <div className="flex items-center gap-3">
+                  {/* 导出参训人员按钮 */}
+                  <PermissionGuard permission="training_export_participants">
+                    {selectedSession.participantsList && selectedSession.participantsList.length > 0 && (
+                      <button
+                        onClick={handleExportParticipantDetails}
+                        className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm transition-colors flex items-center gap-2"
+                        title="导出参训人员详细信息"
+                      >
+                        <Download size={14} />
+                        参训人员导出
+                      </button>
+                    )}
+                  </PermissionGuard>
+                  
                   {/* 导出签到表按钮 */}
                   {user?.role === 'admin' && selectedSession.participantsList && selectedSession.participantsList.length > 0 && (
                     <div className="relative">
@@ -2608,16 +2803,32 @@ export default function TrainingPerformance() {
                                     ¥{((participant as any).actualPrice || (participant as any).paymentAmount || 0).toFixed(2)}
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                    {canDelete ? (
-                                      <button
-                                        onClick={() => handleRemoveParticipant(participant.id, participant.name)}
-                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors"
-                                        title="移除参训者"
-                                      >
-                                        删除
-                                      </button>
+                                    {user?.role === 'admin' ? (
+                                      // 管理员显示删除按钮
+                                      canDelete ? (
+                                        <button
+                                          onClick={() => handleRemoveParticipant(participant.id, participant.name)}
+                                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors"
+                                          title="移除参训者"
+                                        >
+                                          删除
+                                        </button>
+                                      ) : (
+                                        <span className="text-gray-400 dark:text-gray-600 text-xs">无权限</span>
+                                      )
                                     ) : (
-                                      <span className="text-gray-400 dark:text-gray-600 text-xs">无权限</span>
+                                      // 业务员显示修改按钮（如果是自己的客户）
+                                      participant.salespersonName === user?.name ? (
+                                        <button
+                                          onClick={() => handleEditParticipant(participant)}
+                                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                                          title="修改参训信息"
+                                        >
+                                          修改
+                                        </button>
+                                      ) : (
+                                        <span className="text-gray-400 dark:text-gray-600 text-xs">无权限</span>
+                                      )
                                     )}
                                   </td>
                                 </tr>
@@ -3311,6 +3522,15 @@ export default function TrainingPerformance() {
           </div>
         </div>
       )}
+      
+      {/* 参训人员修改模态框 */}
+      <ParticipantEditModal
+        isOpen={isParticipantEditModalOpen}
+        onClose={() => setIsParticipantEditModalOpen(false)}
+        participant={selectedParticipantForEdit}
+        onSuccess={handleParticipantEditSuccess}
+        trainingSession={selectedSession}
+      />
       
       {/* 删除确认对话框 */}
       <DeleteSessionDialog

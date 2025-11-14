@@ -1,11 +1,13 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '@/contexts/authContext';
-import { History, Trash2, RotateCcw, Database, Calendar, Users, AlertCircle, CheckCircle, Shield } from 'lucide-react';
+import { History, Trash2, RotateCcw, Database, Calendar, Users, AlertCircle, CheckCircle, Shield, Edit, User, Clock, Download, Menu } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase/client';
 import type { TrainingSessionFrontend } from '@/lib/supabase/types';
 import trainingSessionService from '@/lib/services/trainingSessionService';
+import auditService from '@/lib/services/auditService';
 
 interface SoftDeletedSession extends TrainingSessionFrontend {
   deletedAt: string;
@@ -27,16 +29,6 @@ interface BackupSession {
   canRestore: boolean;
 }
 
-interface AuditLog {
-  id: string;
-  action: string;
-  entityType: string;
-  entityId: string;
-  userId: string;
-  userName: string;
-  timestamp: string;
-  details: any;
-}
 
 type TabType = 'operations' | 'soft_deleted' | 'backup';
 
@@ -46,7 +38,7 @@ export default function AuditLogs() {
   const [activeTab, setActiveTab] = useState<TabType>('operations');
   const [softDeletedSessions, setSoftDeletedSessions] = useState<SoftDeletedSession[]>([]);
   const [backupSessions, setBackupSessions] = useState<BackupSession[]>([]);
-  // const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]); // 保留用于未来的操作日志功能
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 加载数据
@@ -59,8 +51,12 @@ export default function AuditLogs() {
       setIsLoading(true);
 
       if (activeTab === 'operations') {
-        // 加载操作日志（暂时为空，后续实现）
-        // setAuditLogs([]); // 暂时注释，等实现操作日志功能时启用
+        // 加载审计日志
+        const result = await auditService.getAuditLogs({
+          page: 1,
+          pageSize: 50
+        });
+        setAuditLogs(result.logs);
       } else if (activeTab === 'soft_deleted') {
         // 加载软删除的培训
         const { data, error } = await supabase
@@ -176,30 +172,100 @@ export default function AuditLogs() {
     }
   };
 
+  // 导出审计日志
+  const handleExportAuditLogs = () => {
+    try {
+      // 准备导出数据，只包含简化信息
+      const exportData = auditLogs.map((log, index) => ({
+        '序号': index + 1,
+        '操作人': log.user_name,
+        '操作时间': new Date(log.created_at).toLocaleString('zh-CN'),
+        '操作类型': log.action === 'update_participant' ? '修改参训人员' : log.action,
+        '操作描述': log.details?.description || '',
+        '状态': log.status === 'success' ? '成功' : '失败'
+      }));
+
+      // 创建工作簿
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // 设置列宽
+      const colWidths = [
+        { wch: 8 },  // 序号
+        { wch: 15 }, // 操作人
+        { wch: 20 }, // 操作时间
+        { wch: 15 }, // 操作类型
+        { wch: 50 }, // 操作描述
+        { wch: 10 }  // 状态
+      ];
+      ws['!cols'] = colWidths;
+
+      // 添加工作表
+      XLSX.utils.book_append_sheet(wb, ws, '审计日志');
+
+      // 生成文件名
+      const fileName = `审计日志_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.xlsx`;
+
+      // 导出文件
+      XLSX.writeFile(wb, fileName);
+      
+      toast.success(`审计日志已导出: ${fileName}`);
+    } catch (error) {
+      console.error('导出失败:', error);
+      toast.error('导出失败，请重试');
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      {/* 移动端遮罩层 */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-0 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶部标题栏 */}
-        <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-8 py-6">
+        <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-4 sm:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
+              {/* 移动端菜单按钮 */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <Menu size={24} />
+              </button>
               <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                 <History className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white">审计日志</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">审计日志</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">
                   查看系统关键操作记录、删除记录和备份数据
                 </p>
               </div>
             </div>
+            
+            {/* 导出按钮 - 只在关键操作标签页显示 */}
+            {activeTab === 'operations' && auditLogs.length > 0 && (
+              <button
+                onClick={handleExportAuditLogs}
+                className="inline-flex items-center px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                <Download size={16} className="sm:mr-2" />
+                <span className="hidden sm:inline">导出审计日志</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Tab 切换 */}
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-8">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-8">
           <div className="flex space-x-8">
             <button
               onClick={() => setActiveTab('operations')}
@@ -260,16 +326,100 @@ export default function AuditLogs() {
               <div className="text-gray-500 dark:text-gray-400">加载中...</div>
             </div>
           ) : activeTab === 'operations' ? (
-            // 操作日志（待实现）
-            <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 300px)' }}>
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-full mb-6">
-                  <Shield className="w-10 h-10 text-purple-600 dark:text-purple-400" />
+            // 审计日志列表
+            <div className="space-y-4">
+              {auditLogs.length === 0 ? (
+                <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 300px)' }}>
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-full mb-6">
+                      <Shield className="w-10 h-10 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">关键操作日志</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">记录系统关键操作、数据修改等操作</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500 mt-4">目前没有审计数据</p>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-3">关键操作日志</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-2">记录权限变更、超权操作等关键系统操作</p>
-                <p className="text-sm text-gray-500 dark:text-gray-500 mt-4">⏳ 功能开发中...</p>
-              </div>
+              ) : (
+                auditLogs.map((log) => (
+                  <div key={log.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className="flex items-center space-x-2">
+                            {log.action === 'update_participant' ? (
+                              <Edit className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                            ) : (
+                              <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                            )}
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                              {log.action === 'update_participant' ? '修改参训人员' : log.action}
+                            </h3>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            log.status === 'success' 
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                              : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300'
+                          }`}>
+                            {log.status === 'success' ? '成功' : '失败'}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                            <User size={16} className="mr-2 text-gray-400" />
+                            操作人: {log.user_name}
+                          </div>
+                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                            <Clock size={16} className="mr-2 text-gray-400" />
+                            时间: {new Date(log.created_at).toLocaleString('zh-CN')}
+                          </div>
+                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                            <Database size={16} className="mr-2 text-gray-400" />
+                            资源: {log.resource_type} #{log.resource_id}
+                          </div>
+                        </div>
+
+                        {log.details && (
+                          <div className="bg-gray-50 dark:bg-gray-900/20 rounded-lg p-4">
+                            <h4 className="text-sm font-medium text-gray-800 dark:text-white mb-2">操作详情</h4>
+                            {log.details.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                {log.details.description}
+                              </p>
+                            )}
+                            {log.details.changed_fields && log.details.changed_fields.length > 0 && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                <strong>修改字段:</strong> {log.details.changed_fields.join(', ')}
+                              </div>
+                            )}
+                            {log.details.old_values && log.details.new_values && (
+                              <div className="mt-2 space-y-1">
+                                {Object.keys(log.details.new_values).map((key) => {
+                                  if (log.details.old_values[key] !== log.details.new_values[key]) {
+                                    return (
+                                      <div key={key} className="text-xs text-gray-600 dark:text-gray-300">
+                                        <span className="font-medium">{key}:</span> 
+                                        <span className="text-red-600 dark:text-red-400 ml-1">
+                                          {JSON.stringify(log.details.old_values[key])}
+                                        </span>
+                                        <span className="mx-1">→</span>
+                                        <span className="text-green-600 dark:text-green-400">
+                                          {JSON.stringify(log.details.new_values[key])}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           ) : activeTab === 'soft_deleted' ? (
             // 软删除列表

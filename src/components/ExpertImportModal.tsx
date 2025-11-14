@@ -24,10 +24,16 @@ export default function ExpertImportModal({ isOpen, onClose, onImport }: ExpertI
         '邮箱': 'wang@example.com',
         '专业领域': '人工智能',
         '职称': '教授',
-        '单位': '科技大学',
+        '地区': '北京',
         '简介': '专注于深度学习和计算机视觉研究，发表论文50余篇',
-        '费用': '5000',
-        '状态': '在职'
+        '经验': '10年',
+        '评分': '4.8',
+        '性别': '男',
+        '是否可用': '可预约',
+        '身份证号': '110101199001011234',
+        '银行卡号': '6222001234567890',
+        '课时费': '5000',
+        '简历': 'https://example.com/resume.pdf'
       },
       {
         '姓名': '李博士',
@@ -35,10 +41,16 @@ export default function ExpertImportModal({ isOpen, onClose, onImport }: ExpertI
         '邮箱': 'li@example.com',
         '专业领域': '大数据',
         '职称': '副教授',
-        '单位': '研究院',
+        '地区': '上海',
         '简介': '大数据分析专家，10年行业经验',
-        '费用': '3000',
-        '状态': '在职'
+        '经验': '8年',
+        '评分': '4.5',
+        '性别': '女',
+        '是否可用': '可预约',
+        '身份证号': '310101199202023456',
+        '银行卡号': '6225888888888888',
+        '课时费': '3000',
+        '简历': ''
       }
     ];
 
@@ -86,18 +98,37 @@ export default function ExpertImportModal({ isOpen, onClose, onImport }: ExpertI
           }
 
           // 转换字段名
-          const convertedData = jsonData.map((row: any) => ({
-            name: row['姓名'] || '',
-            phone: row['手机号'] || '',
-            email: row['邮箱'] || '',
-            expertise: row['专业领域'] || '',
-            title: row['职称'] || '',
-            organization: row['单位'] || '',
-            bio: row['简介'] || '',
-            fee: parseFloat(row['费用']) || 0,
-            status: row['状态'] === '离职' ? 'inactive' : 'active',
-            role: 'expert' // 固定为专家角色
-          }));
+          const convertedData = jsonData.map((row: any) => {
+            const availRaw = row['是否可用'];
+            const avail = typeof availRaw === 'boolean'
+              ? availRaw
+              : ['可预约', '是', 'true', '1', 'yes'].includes(String(availRaw).toLowerCase());
+            const gRaw = row['性别'];
+            let gender = '';
+            if (gRaw !== undefined && gRaw !== null) {
+              const s = String(gRaw).trim().toLowerCase();
+              if (['男','male','m'].includes(s)) gender = '男';
+              else if (['女','female','f'].includes(s)) gender = '女';
+              else gender = String(gRaw).trim();
+            }
+            return {
+              name: row['姓名'] || '',
+              phone: row['手机号'] || '',
+              email: row['邮箱'] || '',
+              field: row['专业领域'] || '',
+              title: row['职称'] || '',
+              location: row['地区'] || '',
+              bio: row['简介'] || '',
+              experience: row['经验'] || '',
+              rating: row['评分'] ? parseFloat(row['评分']) : null,
+              available: avail,
+              gender,
+              id_number: row['身份证号'] || '',
+              bank_card_number: row['银行卡号'] || '',
+              hourly_rate: row['课时费'] ? parseFloat(row['课时费']) : null,
+              resume: row['简历'] || ''
+            };
+          });
 
           // 验证必填字段
           const errors: string[] = [];
@@ -108,7 +139,7 @@ export default function ExpertImportModal({ isOpen, onClose, onImport }: ExpertI
             if (!item.phone) {
               errors.push(`第${index + 2}行：手机号不能为空`);
             }
-            if (!item.expertise) {
+            if (!item.field) {
               errors.push(`第${index + 2}行：专业领域不能为空`);
             }
           });

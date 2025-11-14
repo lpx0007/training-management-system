@@ -25,6 +25,9 @@ export default function CustomerImportModal({ isOpen, onClose, onImport }: Custo
         '公司名称': '大风歌',
         '职位': '经理',
         '地区': '江苏',
+        '部门': '人力资源部',
+        '性别': '男',
+        '住宿需求': '无特殊要求',
         '负责业务员': '张三',
         '客户状态': '潜在客户'
       },
@@ -35,6 +38,9 @@ export default function CustomerImportModal({ isOpen, onClose, onImport }: Custo
         '公司名称': '阿萨德发大发',
         '职位': '主管',
         '地区': '上海',
+        '部门': '财务部',
+        '性别': '女',
+        '住宿需求': '需要单间',
         '负责业务员': '李四',
         '客户状态': '已成交'
       }
@@ -91,6 +97,9 @@ export default function CustomerImportModal({ isOpen, onClose, onImport }: Custo
             company: row['公司名称'] || '',
             position: row['职位'] || '',
             location: row['地区'] || '',
+            department: row['部门'] || '',
+            gender: row['性别'] || '',
+            accommodation_requirements: row['住宿需求'] || '',
             salesperson_name: row['负责业务员'] || '',
             status: row['客户状态'] || '潜在客户',
             tags: row['标签'] ? row['标签'].split(',').map((t: string) => t.trim()) : []
@@ -107,6 +116,9 @@ export default function CustomerImportModal({ isOpen, onClose, onImport }: Custo
             }
             if (!item.company) {
               errors.push(`第${index + 2}行：公司名称不能为空`);
+            }
+            if (!item.gender) {
+              errors.push(`第${index + 2}行：性别不能为空`);
             }
           });
 
@@ -159,7 +171,7 @@ export default function CustomerImportModal({ isOpen, onClose, onImport }: Custo
             <h3 className="font-medium text-blue-900 dark:text-blue-300 mb-2">导入说明：</h3>
             <ul className="text-sm text-blue-800 dark:text-blue-400 space-y-1">
               <li>• 支持Excel（.xlsx, .xls）和CSV格式文件</li>
-              <li>• 必填字段：客户姓名、手机号、公司名称</li>
+              <li>• 必填字段：客户姓名、手机号、公司名称、性别</li>
               <li>• 如果手机号已存在，该条记录将被跳过</li>
               <li>• 负责业务员字段请填写已存在的业务员姓名</li>
               <li>• 建议先下载模板，按模板格式填写数据</li>

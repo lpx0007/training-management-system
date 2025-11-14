@@ -82,6 +82,9 @@ export interface Customer {
   created_at: string;
   last_contact: string | null;
   tags: string[] | null;
+  department: string | null; // 部门
+  gender: string; // 性别（必填）
+  accommodation_requirements: string | null; // 住宿需求
 }
 
 // 客户（前端友好类型，包含驼峰命名字段）
@@ -111,10 +114,16 @@ export interface Expert {
   courses: string[] | null;
   location: string | null;
   available: boolean;
+  gender?: string | null;
   bio: string | null;
   past_sessions: number;
   total_participants: number;
   phone: string | null;
+  email?: string | null;
+  id_number?: string | null;
+  bank_card_number?: string | null;
+  hourly_rate?: number | null;
+  resume?: string | null;
   created_at: string;
 }
 

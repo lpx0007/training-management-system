@@ -1,0 +1,116 @@
+﻿\src\App.tsx:27 - default
+\src\constants\featurePermissionMapping.ts:6 - FeaturePermissionMapping (used in module)
+\src\constants\featurePermissionMapping.ts:20 - FEATURE_PERMISSION_MAPPINGS (used in module)
+\src\constants\featurePermissionMapping.ts:180 - getPermissionUsedByFeatures
+\src\constants\featurePermissionMapping.ts:189 - featureHasPermissions
+\src\constants\index.ts:7 - PERMISSION_CATEGORIES
+\src\constants\index.ts:8 - ROLE_DEFAULT_PERMISSIONS
+\src\constants\index.ts:9 - getAllPermissions
+\src\constants\index.ts:10 - getPermissionCategories
+\src\constants\index.ts:11 - getPermissionById
+\src\constants\index.ts:12 - getRoleDefaultPermissions
+\src\constants\index.ts:13 - Permission
+\src\constants\index.ts:14 - PermissionCategory
+\src\constants\index.ts:19 - MENU_FEATURES
+\src\constants\index.ts:20 - ROLE_DEFAULT_MENU_FEATURES
+\src\constants\index.ts:21 - getMenuFeatureById
+\src\constants\index.ts:22 - getMenuFeatureByPath
+\src\constants\index.ts:23 - getRoleDefaultMenuFeatures
+\src\constants\index.ts:24 - menuFeatureRequiresPermissions
+\src\constants\index.ts:25 - MenuFeature
+\src\contexts\authContext.ts:4 - UserRole (used in module)
+\src\lib\dataService.ts:7 - User (used in module)
+\src\lib\dataService.ts:18 - Customer (used in module)
+\src\lib\dataService.ts:42 - Course (used in module)
+\src\lib\dataService.ts:55 - Permission (used in module)
+\src\lib\dataService.ts:63 - Expert (used in module)
+\src\lib\dataService.ts:85 - Salesperson (used in module)
+\src\lib\dataService.ts:106 - TrainingSession (used in module)
+\src\pages\DataManagement.tsx:17 - default
+\src\pages\Home.tsx:4 - default
+\src\pages\TrainingManagement.tsx:16 - default (used in module)
+\src\types\announcement.ts:2 - AnnouncementStatus (used in module)
+\src\types\dataManagement.ts:5 - ExportFormat (used in module)
+\src\types\dataManagement.ts:7 - ExportRange (used in module)
+\src\types\dataManagement.ts:11 - OperationType (used in module)
+\src\types\dataManagement.ts:13 - OperationStatus (used in module)
+\src\types\dataManagement.ts:15 - ValidationSeverity (used in module)
+\src\types\dataManagement.ts:17 - ErrorType (used in module)
+\src\types\dataManagement.ts:80 - ImportError (used in module)
+\src\types\dataManagement.ts:88 - DataManagementError
+\src\types\dataManagement.ts:135 - FieldDefinition
+\src\types\dataManagement.ts:160 - CourseTemplate
+\src\types\dataManagement.ts:186 - CustomerTemplate
+\src\types\dataManagement.ts:212 - TrainingSessionTemplate
+\src\types\notification.ts:1 - NotificationType (used in module)
+\src\utils\imageUtils.ts:6 - ImageCompressOptions (used in module)
+\src\utils\permissionValidator.ts:40 - validateUserPermissions (used in module)
+\src\utils\permissionValidator.ts:147 - validateAllUsersPermissions (used in module)
+\src\utils\permissionValidator.ts:176 - fixPermissionIssue
+\src\utils\permissionValidator.ts:272 - getPermissionDiagnosticReport
+\src\utils\permissionValidator.ts:27 - PermissionIssue (used in module)
+\src\utils\statusUtils.ts:106 - getStatusColor
+\src\utils\statusUtils.ts:117 - getStatusBgColor
+\src\utils\statusUtils.ts:196 - normalizeStatus
+\src\utils\statusUtils.ts:9 - TrainingStatus (used in module)
+\src\utils\statusUtils.ts:138 - STATUS_OPTIONS (used in module)
+\src\utils\statusUtils.ts:149 - FILTER_STATUS_OPTIONS
+\src\utils\statusUtils.ts:157 - STATUS_MAP
+\src\components\Notifications\NotificationBellSimple.tsx:14 - default
+\src\lib\generators\templateGenerator.ts:6 - generateTemplate (used in module)
+\src\lib\services\accountCreationService.ts:317 - default
+\src\lib\services\salespersonService.ts:63 - getAllCourses
+\src\lib\services\salesTrackingService_backup.ts:80 - getSalesPersonsData (used in module)
+\src\lib\services\salesTrackingService_backup.ts:267 - getMonthlySalesData
+\src\lib\services\salesTrackingService_backup.ts:324 - getDepartmentSalesData
+\src\lib\services\salesTrackingService_backup.ts:372 - getConversionRateDistribution
+\src\lib\services\salesTrackingService_backup.ts:4 - SalesPersonData (used in module)
+\src\lib\services\salesTrackingService_backup.ts:15 - MonthlySalesData (used in module)
+\src\lib\services\salesTrackingService_backup.ts:21 - DepartmentSalesData (used in module)
+\src\lib\services\salesTrackingService.ts:41 - getSalesPersonsData (used in module)
+\src\lib\services\salesTrackingService.ts:227 - getMonthlySalesData
+\src\lib\services\salesTrackingService.ts:276 - getDepartmentSalesData
+\src\lib\services\salesTrackingService.ts:317 - getConversionRateDistribution
+\src\lib\services\salesTrackingService.ts:4 - CompletedCustomer (used in module)
+\src\lib\services\salesTrackingService.ts:29 - DepartmentSalesData (used in module)
+\src\lib\supabase\index.ts:5 - supabase
+\src\lib\supabase\index.ts:6 - SupabaseClient
+\src\lib\supabase\index.ts:8 - supabaseService
+\src\lib\supabase\index.ts:10 - handleSupabaseError
+\src\lib\supabase\index.ts:10 - logError
+\src\lib\supabase\index.ts:10 - retryOperation
+\src\lib\supabase\index.ts:10 - SupabaseError
+\src\lib\supabase\index.ts:324 - dbToFrontendCustomer
+\src\lib\supabase\index.ts:335 - dbToFrontendTrainingSession
+\src\lib\supabase\index.ts:372 - dbToFrontendCourse
+\src\lib\supabase\index.ts:393 - dbToFrontendTrainingParticipant
+\src\lib\supabase\index.ts:412 - frontendToDbCustomer
+\src\lib\supabase\index.ts:7 - UserRole
+\src\lib\supabase\index.ts:10 - UserProfile
+\src\lib\supabase\index.ts:35 - Prospectus
+\src\lib\supabase\index.ts:56 - ProspectusDownload
+\src\lib\supabase\index.ts:69 - Customer
+\src\lib\supabase\index.ts:88 - CustomerFrontend
+\src\lib\supabase\index.ts:102 - Expert
+\src\lib\supabase\index.ts:122 - Salesperson
+\src\lib\supabase\index.ts:125 - SalespersonPerformance
+\src\lib\supabase\index.ts:136 - LegacyCourse
+\src\lib\supabase\index.ts:149 - CourseDB
+\src\lib\supabase\index.ts:169 - Course
+\src\lib\supabase\index.ts:190 - CourseWithSessions
+\src\lib\supabase\index.ts:198 - TrainingSession
+\src\lib\supabase\index.ts:232 - TrainingSessionFrontend
+\src\lib\supabase\index.ts:254 - TrainingParticipant
+\src\lib\supabase\index.ts:272 - TrainingParticipantFrontend
+\src\lib\supabase\index.ts:290 - CustomerTrainingHistory
+\src\lib\supabase\index.ts:301 - Permission
+\src\lib\supabase\index.ts:309 - UserPermission
+\src\lib\supabase\index.ts:315 - ExpertFeedback
+\src\lib\supabase\index.ts:440 - Database
+\src\lib\supabase\prospectusService.ts:19 - generateFileName (used in module)
+\src\lib\supabase\prospectusService.ts:33 - getStoragePath (used in module)
+\src\lib\supabase\prospectusService.ts:42 - validateFile (used in module)
+\src\lib\supabase\storageService.ts:183 - storageService (used in module)
+\src\lib\volcengine\posterService.ts:67 - generatePosterPrompt
+\src\lib\volcengine\posterService.ts:6 - GeneratePosterOptions (used in module)
+\src\lib\volcengine\posterService.ts:15 - GeneratePosterResponse (used in module)

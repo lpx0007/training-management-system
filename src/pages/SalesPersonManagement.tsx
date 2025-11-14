@@ -27,6 +27,7 @@ import Sidebar from '@/components/Sidebar';
 import NotificationBell from '@/components/Notifications/NotificationBell';
 import SalesPersonImportModal from '@/components/SalesPersonImportModal';
 import supabaseService from '@/lib/supabase/supabaseService';
+import { supabase } from '@/lib/supabase/client';
 import type { Salesperson as BaseSalesperson } from '@/lib/supabase/types';
 
 // 扩展 Salesperson 类型以包含绩效数据
@@ -158,6 +159,42 @@ export default function SalesPersonManagement() {
       const allCustomers = await supabaseService.getCustomers();
       console.log('👥 客户总数:', allCustomers.length);
       
+      // 加载所有参训记录用于计算销售额（按 customer_id → customers.salesperson_id 归属）
+      // 若参训记录缺少 customer_id，再兜底使用姓名映射到ID
+      const customerToSalespersonId = new Map<number, string>();
+      (allCustomers || []).forEach((c: any) => {
+        if (c?.id && c?.salesperson_id) customerToSalespersonId.set(c.id, c.salesperson_id);
+      });
+
+      const nameToSalespersonId = new Map<string, string>();
+      (baseSalespersons || []).forEach((sp: any) => {
+        if (sp?.name && sp?.id) nameToSalespersonId.set(sp.name, sp.id);
+      });
+
+      const revenueBySalespersonId = new Map<string, number>();
+      try {
+        const { data: allParticipants } = await supabase
+          .from('training_participants')
+          .select('customer_id, salesperson_name, actual_price, payment_amount');
+        (allParticipants || []).forEach((p: any) => {
+          const amount = (Number(p?.actual_price) || Number(p?.payment_amount) || 0);
+          if (!amount) return;
+
+          let ownerId: string | undefined;
+          if (p?.customer_id && customerToSalespersonId.has(p.customer_id)) {
+            ownerId = customerToSalespersonId.get(p.customer_id)!;
+          } else if (p?.salesperson_name && nameToSalespersonId.has(p.salesperson_name)) {
+            // 兜底：参训记录未关联客户时，才使用姓名映射
+            ownerId = nameToSalespersonId.get(p.salesperson_name)!;
+          }
+
+          if (!ownerId) return;
+          revenueBySalespersonId.set(ownerId, (revenueBySalespersonId.get(ownerId) || 0) + amount);
+        });
+      } catch (e) {
+        console.warn('加载参训记录失败，销售额将显示为0:', e);
+      }
+      
       // 为每个业务员添加绩效数据（从数据库计算）
       const salespersonsWithPerformance: Salesperson[] = baseSalespersons.map(sp => {
         // 计算该业务员的客户数量 - 使用 id 匹配（现在 id 就是 UUID）
@@ -171,7 +208,7 @@ export default function SalesPersonManagement() {
           ...sp,
           joinDate: sp.join_date || undefined,
           performance: {
-            revenue: 0,
+            revenue: revenueBySalespersonId.get(sp.id) || 0,
             completedSessions: 0,
             conversionRate: 0,
             customers: customerCount
@@ -901,17 +938,6 @@ export default function SalesPersonManagement() {
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">最低转化率</label>
-                    <select
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    >
-                      <option value="">全部</option>
-                      <option value="20">20%以上</option>
-                      <option value="30">30%以上</option>
-                      <option value="40">40%以上</option>
-                    </select>
-                  </div>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
                   <button className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all">
@@ -994,18 +1020,6 @@ export default function SalesPersonManagement() {
                       <th
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-                        onClick={() => handleSort('performance.conversionRate')}
-                      >
-                        <div className="flex items-center">
-                          转化率
-                          {sortConfig?.key === 'performance.conversionRate' && (
-                            <i className={`fas ml-1 ${sortConfig.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`}></i>
-                          )}
-                        </div>
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                         onClick={() => handleSort('joinDate')}
                       >
                         <div className="flex items-center">
@@ -1061,17 +1075,6 @@ export default function SalesPersonManagement() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                           {salesperson.performance.customers}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                              <div 
-                                className="bg-blue-600 h-2.5 rounded-full" 
-                                style={{ width: `${salesperson.performance.conversionRate}%` }}
-                              ></div>
-                            </div>
-                            <span className="ml-3 text-sm font-medium text-gray-600 dark:text-gray-300">{salesperson.performance.conversionRate}%</span>
-                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                           {salesperson.joinDate}
@@ -1280,10 +1283,6 @@ export default function SalesPersonManagement() {
                   <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">客户总数</p>
                     <p className="text-xl font-bold text-gray-800 dark:text-white">{selectedSalesperson.performance.customers}</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">转化率</p>
-                    <p className="text-xl font-bold text-gray-800 dark:text-white">{selectedSalesperson.performance.conversionRate}%</p>
                   </div>
                 </div>
               </div>

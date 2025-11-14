@@ -720,6 +720,68 @@ class SupabaseService {
     }
   }
 
+  /**
+   * 修改参训人员信息
+   */
+  async updateParticipant(
+    participantId: number,
+    updates: {
+      actual_price?: number;
+      discount_rate?: number;
+      payment_amount?: number;
+      participation_mode?: 'online' | 'offline';
+      payment_status?: string;
+    }
+  ): Promise<boolean> {
+    try {
+      // 先获取原始数据用于审计日志
+      const { data: oldData } = await supabase
+        .from('training_participants')
+        .select('*')
+        .eq('id', participantId)
+        .single();
+
+      if (!oldData) {
+        throw new Error('参训人员不存在');
+      }
+
+      // 更新数据
+      const { error } = await supabase
+        .from('training_participants')
+        .update(updates)
+        .eq('id', participantId);
+
+      if (error) throw error;
+
+      return true;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'updateParticipant');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 获取参训人员详细信息
+   */
+  async getParticipantById(participantId: number): Promise<TrainingParticipant | null> {
+    try {
+      const { data, error } = await supabase
+        .from('training_participants')
+        .select('*')
+        .eq('id', participantId)
+        .single();
+
+      if (error) throw error;
+      
+      return data as TrainingParticipant;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'getParticipantById');
+      throw supabaseError;
+    }
+  }
+
   // ============================================
   // 专家管理方法
   // ============================================
@@ -821,6 +883,34 @@ class SupabaseService {
     } catch (error) {
       const supabaseError = handleSupabaseError(error);
       logError(supabaseError, 'deleteExpert');
+      throw supabaseError;
+    }
+  }
+
+  /**
+   * 上传专家简历到存储，并返回公开访问的 URL
+   * 需要在 Supabase Storage 中创建名为 expert-resumes 的 Bucket（公开读取）
+   */
+  async uploadExpertResume(expertId: number, file: File): Promise<string> {
+    try {
+      const bucket = 'expert-resumes';
+      const ext = file.name?.split('.').pop() || 'pdf';
+      const path = `experts/${expertId}/resume_${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from(bucket)
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      return data.publicUrl;
+    } catch (error) {
+      const supabaseError = handleSupabaseError(error);
+      logError(supabaseError, 'uploadExpertResume');
       throw supabaseError;
     }
   }

@@ -553,7 +553,7 @@ class DataManagementService {
   static getExportableFields(dataType: DataType): string[] {
     const fields: Record<DataType, string[]> = {
       courses: ['id', 'module', 'name', 'code', 'duration_days', 'sessions_per_year', 'standard_fee', 'online_price', 'offline_price', 'average_price', 'description', 'notes', 'status', 'created_at'],
-      experts: ['id', 'name', 'title', 'field', 'experience', 'rating', 'courses', 'location', 'available', 'bio', 'past_sessions', 'total_participants', 'created_at'],
+      experts: ['id', 'name', 'phone', 'email', 'title', 'gender', 'field', 'experience', 'rating', 'courses', 'location', 'available', 'bio', 'past_sessions', 'total_participants', 'id_number', 'bank_card_number', 'hourly_rate', 'resume', 'created_at'],
       customers: ['id', 'name', 'phone', 'email', 'company', 'position', 'location', 'status', 'salesperson_name', 'follow_up_status', 'last_contact', 'tags', 'created_at'],
       salespersons: ['id', 'name', 'phone', 'email', 'department', 'position', 'join_date', 'status', 'team', 'created_at'],
       training_sessions: ['id', 'name', 'date', 'end_date', 'participants', 'expert_name', 'area', 'revenue', 'status', 'rating', 'salesperson_name', 'course_id', 'course_name', 'session_number', 'capacity', 'created_at'],

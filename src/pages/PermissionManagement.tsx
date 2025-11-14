@@ -6,7 +6,7 @@
 import { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '@/contexts/authContext';
 import { motion } from 'framer-motion';
-import { Shield, Search, Users as UsersIcon, UserCog } from 'lucide-react';
+import { Shield, Search, Users as UsersIcon, UserCog, Menu } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
 import supabaseService from '@/lib/supabase/supabaseService';
@@ -298,6 +298,14 @@ export default function PermissionManagement() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* 移动端遮罩层 */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-0 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       <Sidebar 
         sidebarOpen={sidebarOpen} 
         setSidebarOpen={setSidebarOpen} 
@@ -309,11 +317,12 @@ export default function PermissionManagement() {
         <header className="bg-white dark:bg-gray-800 shadow-sm z-20">
           <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
             <div className="flex items-center">
-              <button 
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mr-4"
+              {/* 移动端菜单按钮 */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg mr-3"
               >
-                <i className="fas fa-bars"></i>
+                <Menu size={24} />
               </button>
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">权限管理</h1>
             </div>

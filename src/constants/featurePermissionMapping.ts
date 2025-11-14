@@ -49,6 +49,7 @@ export const FEATURE_PERMISSION_MAPPINGS: FeaturePermissionMapping[] = [
       'training_view_stats',
       'training_import',
       'training_export',
+      'training_export_participants', // 导出参训人员详细信息
       'data_download_template', // 支持下载导入模板
       // 跨功能权限：培训详情中可以下载招商简章
       'prospectus_download',

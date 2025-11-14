@@ -4,7 +4,7 @@ import { saveAs } from 'file-saver';
 interface AttendanceRecord {
   name: string;
   salespersonName: string;
-  phone: string;
+  company: string;
   signature?: string;
 }
 
@@ -33,14 +33,14 @@ export const exportAllAttendanceSheet = (config: AttendanceSheetConfig): void =>
       ['签到表', '', '', ''], // 第一排：签到表标题
       [`${courseName}    ${dateRange}    ${totalParticipants}人`, '', '', ''], // 第二排：课程信息（不带字段标签）
       [], // 空行
-      ['参训人', '负责业务员', '手机号码', '签名'] // 表格列头
+      ['参训人', '单位/公司', '负责业务员', '签名'] // 表格列头
     ];
 
     // 准备数据行
     const dataRows = participants.map(p => [
       p.name,
+      p.company || '',
       p.salespersonName || '',
-      p.phone || '',
       '' // 签名列留空
     ]);
 
@@ -53,8 +53,8 @@ export const exportAllAttendanceSheet = (config: AttendanceSheetConfig): void =>
     // 设置列宽
     worksheet['!cols'] = [
       { wch: 15 }, // 参训人
+      { wch: 25 }, // 单位/公司
       { wch: 15 }, // 负责业务员
-      { wch: 15 }, // 手机号码
       { wch: 20 }  // 签名
     ];
 
@@ -145,14 +145,14 @@ export const exportAttendanceSheetBySalesperson = (config: AttendanceSheetConfig
         ['签到表', '', '', ''], // 第一排：签到表标题
         [`${courseName}    ${dateRange}    ${totalParticipants}人    业务员：${salesperson}`, '', '', ''], // 第二排：课程信息+业务员（不带字段标签）
         [], // 空行
-        ['参训人', '负责业务员', '手机号码', '签名'] // 表格列头
+        ['参训人', '单位/公司', '负责业务员', '签名'] // 表格列头
       ];
 
       // 准备数据行
       const dataRows = salespersonParticipants.map(p => [
         p.name,
+        p.company || '',
         p.salespersonName || '',
-        p.phone || '',
         '' // 签名列留空
       ]);
 
@@ -165,8 +165,8 @@ export const exportAttendanceSheetBySalesperson = (config: AttendanceSheetConfig
       // 设置列宽
       worksheet['!cols'] = [
         { wch: 15 }, // 参训人
+        { wch: 25 }, // 单位/公司
         { wch: 15 }, // 负责业务员
-        { wch: 15 }, // 手机号码
         { wch: 20 }  // 签名
       ];
 

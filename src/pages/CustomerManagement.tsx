@@ -17,7 +17,8 @@ import {
   UserPlus,
   UserCircle,
   Upload,
-  Download
+  Download,
+  Menu
 } from 'lucide-react';
 import { Empty } from '@/components/Empty';
 import Sidebar from '@/components/Sidebar';
@@ -64,7 +65,10 @@ export default function CustomerManagement() {
     location: '',
     status: '潜在客户',
     tags: [],
-    avatar: null
+    avatar: null,
+    department: '',
+    gender: '',
+    accommodation_requirements: ''
   });
 
   // 业务员列表
@@ -589,6 +593,9 @@ export default function CustomerManagement() {
         公司名称: customer.company || '',
         职位: customer.position || '',
         地区: customer.location || '',
+        部门: customer.department || '',
+        性别: customer.gender || '',
+        住宿需求: customer.accommodation_requirements || '',
         负责业务员: customer.salesperson_name || '',
         客户状态: customer.status || '潜在客户'
       }));
@@ -663,7 +670,10 @@ export default function CustomerManagement() {
         follow_up_status: '待跟进',
         last_contact: new Date().toISOString().split('T')[0],
         tags: (newCustomerData.tags as string[]) || [],
-        avatar: null
+        avatar: null,
+        department: newCustomerData.department || null,
+        gender: newCustomerData.gender || '',
+        accommodation_requirements: newCustomerData.accommodation_requirements || null
       };
 
       console.log('准备添加的客户数据:', customerToAdd);
@@ -769,7 +779,7 @@ export default function CustomerManagement() {
       {/* 移动端遮罩层 */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-20 lg:hidden"
+          className="fixed inset-0 bg-black bg-opacity-0 z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -782,10 +792,10 @@ export default function CustomerManagement() {
           <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
             <div className="flex items-center">
               <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mr-4"
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg mr-3"
               >
-                <i className="fas fa-bars"></i>
+                <Menu size={24} />
               </button>
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white">客户信息管理</h1>
             </div>
@@ -933,6 +943,29 @@ export default function CustomerManagement() {
                         />
                       </div>
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">部门</label>
+                        <input
+                          type="text"
+                          value={editCustomerData.department || ''}
+                          onChange={(e) => setEditCustomerData({ ...editCustomerData, department: e.target.value })}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          placeholder="请输入部门"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">性别 *</label>
+                        <select
+                          value={editCustomerData.gender || ''}
+                          onChange={(e) => setEditCustomerData({ ...editCustomerData, gender: e.target.value })}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          required
+                        >
+                          <option value="">请选择性别</option>
+                          <option value="男">男</option>
+                          <option value="女">女</option>
+                        </select>
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">跟进状态</label>
                         <select
                           value={editCustomerData.followUpStatus || ''}
@@ -968,6 +1001,17 @@ export default function CustomerManagement() {
                           </select>
                         </div>
                       )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">住宿需求</label>
+                      <textarea
+                        value={editCustomerData.accommodation_requirements || ''}
+                        onChange={(e) => setEditCustomerData({ ...editCustomerData, accommodation_requirements: e.target.value })}
+                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="请输入住宿需求备注"
+                        rows={3}
+                      />
                     </div>
 
                     <div>
@@ -1552,9 +1596,24 @@ export default function CustomerManagement() {
                       <MapPin size={16} className="text-gray-400 mr-2" />
                       <span className="text-sm text-gray-600 dark:text-gray-300">{selectedCustomer.location}</span>
                     </div>
+                    <div className="flex items-center">
+                      <Users size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">部门: {selectedCustomer.department || '未填写'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <UserCircle size={16} className="text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600 dark:text-gray-300">性别: {selectedCustomer.gender || '未填写'}</span>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedCustomer.accommodation_requirements && (
+                    <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">住宿需求</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{selectedCustomer.accommodation_requirements}</div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div className="flex items-center">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${selectedCustomer.followUpStatus === '已完成'
                         ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
@@ -1757,6 +1816,29 @@ export default function CustomerManagement() {
                       placeholder="请输入职位"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">部门</label>
+                    <input
+                      type="text"
+                      value={newCustomerData.department || ''}
+                      onChange={(e) => setNewCustomerData({ ...newCustomerData, department: e.target.value })}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="请输入部门"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">性别 *</label>
+                    <select
+                      value={newCustomerData.gender || ''}
+                      onChange={(e) => setNewCustomerData({ ...newCustomerData, gender: e.target.value })}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                    >
+                      <option value="">请选择性别</option>
+                      <option value="男">男</option>
+                      <option value="女">女</option>
+                    </select>
+                  </div>
                   {user?.role === 'admin' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">负责业务员</label>
@@ -1781,6 +1863,17 @@ export default function CustomerManagement() {
                       </select>
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">住宿需求</label>
+                  <textarea
+                    value={newCustomerData.accommodation_requirements || ''}
+                    onChange={(e) => setNewCustomerData({ ...newCustomerData, accommodation_requirements: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="请输入住宿需求备注"
+                    rows={3}
+                  />
                 </div>
 
                 <div>
