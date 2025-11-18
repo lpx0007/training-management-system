@@ -215,6 +215,21 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'performance_export', // 可以导出业绩数据
     'data_view_history',
     // 注意：performance_view_all_departments 需要管理员手动分配
+  ],
+  conference_service: [
+    // 会务客服权限
+    'training_view',                  // 查看培训计划
+    'training_manage_participant',    // 修改参训人信息
+    'training_export_participants',   // 导出参训人明细
+    'prospectus_view',                // 查看招商简章列表
+    'prospectus_download',            // 下载招商简章
+    'prospectus_upload',              // 上传招商简章（限自己负责的课程）
+    'prospectus_edit',                // 编辑招商简章（限自己负责的课程）
+    'schedule_view',                  // 查看课表列表
+    'schedule_download',              // 下载课表
+    'schedule_upload',                // 上传课表（限自己负责的课程）
+    'schedule_edit',                  // 编辑课表（限自己负责的课程）
+    'customer_view',                  // 查看客户信息（参训人详情）
   ]
 };
 

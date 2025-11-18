@@ -442,6 +442,7 @@ export default function SalesPersonManagement() {
     '专家': 'expert',
     '培训师': 'expert',
     '讲师': 'expert',
+    '会务客服': 'conference_service',
   };
 
   // 获取职位对应的角色
@@ -636,7 +637,7 @@ export default function SalesPersonManagement() {
               >
                 <i className="fas fa-bars"></i>
               </button>
-              <h1 className="text-xl font-semibold text-gray-800 dark:text-white">业务员管理</h1>
+              <h1 className="text-xl font-semibold text-gray-800 dark:text-white">员工管理</h1>
             </div>
             <div className="flex items-center space-x-4">
               <NotificationBell />
@@ -673,7 +674,7 @@ export default function SalesPersonManagement() {
                 className="px-2 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center text-sm sm:text-base"
               >
                 <Plus size={16} className="sm:mr-2" />
-                <span className="ml-1 sm:ml-0">添加<span className="hidden sm:inline">业务员</span></span>
+                <span className="ml-1 sm:ml-0">添加<span className="hidden sm:inline">员工</span></span>
               </motion.button>
             </div>
           </div>
@@ -1203,7 +1204,7 @@ export default function SalesPersonManagement() {
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">业务员详情</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">员工详情</h2>
                 <button
                   onClick={() => setIsDetailModalOpen(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1411,7 +1412,7 @@ export default function SalesPersonManagement() {
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">添加业务员</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">添加员工</h2>
                 <button
                   onClick={() => setIsAddModalOpen(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1449,22 +1450,13 @@ export default function SalesPersonManagement() {
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     >
-                      <optgroup label="部门经理">
-                        <option value="部门经理">部门经理</option>
-                      </optgroup>
-                      <optgroup label="销售人员">
-                        <option value="销售顾问">销售顾问</option>
-                        <option value="销售专员">销售专员</option>
-                        <option value="业务员">业务员</option>
-                      </optgroup>
-                      <optgroup label="专家/讲师">
-                        <option value="专家">专家</option>
-                        <option value="培训师">培训师</option>
-                        <option value="讲师">讲师</option>
-                      </optgroup>
+                      <option value="管理员">管理员</option>
+                      <option value="部门经理">部门经理</option>
+                      <option value="业务员">业务员</option>
+                      <option value="会务客服">会务客服</option>
                     </select>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      💡 提示：更改为"部门经理"将自动授予部门经理权限
+                      💡 提示：更改职位将自动授予对应角色的权限。专家请在"专家管理"中添加。
                     </p>
                   </div>
                   <div>
@@ -1678,7 +1670,7 @@ export default function SalesPersonManagement() {
            >
              <div className="p-6">
                <div className="flex items-center justify-between mb-6">
-                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">编辑业务员信息</h2>
+                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">编辑员工信息</h2>
                  <button
                    onClick={() => setIsEditSalespersonModalOpen(false)}
                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1703,26 +1695,17 @@ export default function SalesPersonManagement() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">职位/角色 *</label>
                     <select
                       name="position"
-                      defaultValue={selectedSalesperson.position || '销售顾问'}
+                      defaultValue={selectedSalesperson.position || '业务员'}
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       required
                     >
-                      <optgroup label="部门经理">
-                        <option value="部门经理">部门经理</option>
-                      </optgroup>
-                      <optgroup label="销售人员">
-                        <option value="销售顾问">销售顾问</option>
-                        <option value="销售专员">销售专员</option>
-                        <option value="业务员">业务员</option>
-                      </optgroup>
-                      <optgroup label="专家/讲师">
-                        <option value="专家">专家</option>
-                        <option value="培训师">培训师</option>
-                        <option value="讲师">讲师</option>
-                      </optgroup>
+                      <option value="管理员">管理员</option>
+                      <option value="部门经理">部门经理</option>
+                      <option value="业务员">业务员</option>
+                      <option value="会务客服">会务客服</option>
                     </select>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      💡 提示：更改为"部门经理"将自动授予部门经理权限
+                      💡 提示：更改职位将自动授予对应角色的权限。专家请在"专家管理"中编辑。
                     </p>
                   </div>
                    <div>

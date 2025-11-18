@@ -56,7 +56,7 @@ export const MENU_FEATURES: MenuFeature[] = [
   },
   {
     id: 'salesperson_management',
-    name: '业务员管理',
+    name: '员工管理',
     path: '/salesperson-management',
     icon: 'user-friends',
     description: '管理业务员信息和绩效',
@@ -185,6 +185,14 @@ export const ROLE_DEFAULT_MENU_FEATURES: Record<UserRole, string[]> = {
     'salesperson_management',
     'sales_tracking',
     'profile_settings',
+  ],
+  conference_service: [
+    // 会务客服默认功能面板
+    'dashboard',              // 仪表盘
+    'training_management',    // 培训计划
+    'prospectus_management',  // 招商简章
+    'schedule_management',    // 课表管理
+    'profile_settings',       // 个人设置
   ]
 };
 

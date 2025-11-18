@@ -672,17 +672,20 @@ export default function SalesTracking() {
                 >
                   📋 课程销售明细
                 </button>
-                <button
-                  onClick={() => setActiveTab('department')}
-                  className={cn(
-                    "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-                    activeTab === 'department'
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-gray-300"
-                  )}
-                >
-                  🏢 部门业绩明细
-                </button>
+                {/* 部门业绩明细 - 仅管理员可见 */}
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => setActiveTab('department')}
+                    className={cn(
+                      "py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                      activeTab === 'department'
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-gray-300"
+                    )}
+                  >
+                    🏢 部门业绩明细
+                  </button>
+                )}
               </nav>
             </div>
 
@@ -1025,8 +1028,8 @@ export default function SalesTracking() {
           </div>
         )}
 
-        {/* Tab 3: 部门业绩明细 */}
-        {activeTab === 'department' && (
+        {/* Tab 3: 部门业绩明细 - 仅管理员可见 */}
+        {activeTab === 'department' && user?.role === 'admin' && (
           <div>
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
               <h3 className="font-semibold text-gray-800 dark:text-white">部门业绩明细</h3>

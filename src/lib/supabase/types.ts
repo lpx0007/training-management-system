@@ -4,7 +4,7 @@
  */
 
 // 用户角色类型
-export type UserRole = 'admin' | 'salesperson' | 'expert' | 'manager';
+export type UserRole = 'admin' | 'salesperson' | 'expert' | 'manager' | 'conference_service';
 
 // 用户资料
 export interface UserProfile {
@@ -258,6 +258,8 @@ export interface TrainingSession {
   rating: number | null;
   salesperson_id: string | null;  // 改为 UUID
   salesperson_name: string | null;
+  conference_service_id: string | null;  // 会务客服ID (UUID)
+  conference_service_name: string | null; // 会务客服姓名
   course_id: number | null;       // 关联课程ID
   course_name: string | null;      // 冗余：课程名称
   session_number: number | null;   // 第几期
@@ -277,13 +279,15 @@ export interface TrainingSession {
 }
 
 // 培训场次（前端友好类型，包含驼峰命名字段）
-export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'course_id' | 'course_name' | 'session_number' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id' | 'schedule_id' | 'deleted_at' | 'deleted_by' | 'deleted_by_name' | 'delete_reason'> {
+export interface TrainingSessionFrontend extends Omit<TrainingSession, 'expert_id' | 'expert_name' | 'end_date' | 'salesperson_id' | 'salesperson_name' | 'conference_service_id' | 'conference_service_name' | 'course_id' | 'course_name' | 'session_number' | 'course_description' | 'created_at' | 'detailed_address' | 'prospectus_id' | 'schedule_id' | 'deleted_at' | 'deleted_by' | 'deleted_by_name' | 'delete_reason'> {
   expertId: number | null;
   expert: string;
   endDate: string | null;
   detailedAddress: string | null;
   salespersonId: string | null;  // 改为 UUID
   salespersonName: string | null;
+  conferenceServiceId: string | null;  // 会务客服ID (UUID)
+  conferenceServiceName: string | null; // 会务客服姓名
   courseId: number | null;        // 关联课程ID
   courseName: string | null;      // 课程名称
   sessionNumber: number;          // 第几期
@@ -398,6 +402,8 @@ export function dbToFrontendTrainingSession(dbSession: TrainingSession): Trainin
     rating: dbSession.rating,
     salespersonId: dbSession.salesperson_id,
     salespersonName: dbSession.salesperson_name,
+    conferenceServiceId: dbSession.conference_service_id,
+    conferenceServiceName: dbSession.conference_service_name,
     courseId: dbSession.course_id,
     courseName: dbSession.course_name,      // 新增
     sessionNumber: dbSession.session_number || 1,  // 新增

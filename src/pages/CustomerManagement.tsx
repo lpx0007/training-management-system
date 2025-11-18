@@ -156,6 +156,73 @@ export default function CustomerManagement() {
     }
   }, [user, allCustomers]);
 
+  // 重新加载客户数据（并计算状态）
+  const reloadCustomers = async () => {
+    try {
+      const customers = await supabaseService.getCustomers();
+      
+      // 为每个客户自动计算状态
+      const customersWithStatus = await Promise.all(
+        customers.map(async (customer) => {
+          const calculatedStatus = await calculateCustomerStatus(customer);
+          return {
+            ...customer,
+            follow_up_status: calculatedStatus
+          };
+        })
+      );
+      
+      setAllCustomers(customersWithStatus);
+    } catch (error) {
+      console.error('重新加载客户数据失败:', error);
+    }
+  };
+
+  // 自动计算客户状态
+  const calculateCustomerStatus = async (customer: Customer): Promise<string> => {
+    try {
+      // 1. 检查是否有成交记录（参加过培训）
+      const { data: trainingData, error: trainingError } = await supabase
+        .from('training_participants')
+        .select('id')
+        .eq('customer_id', customer.id)
+        .limit(1);
+
+      if (trainingError) {
+        console.error('查询成交记录失败:', trainingError);
+        return '待跟进';
+      }
+
+      // 如果有成交记录，状态为"已成交"
+      if (trainingData && trainingData.length > 0) {
+        return '已成交';
+      }
+
+      // 2. 检查是否有跟进记录
+      const { data: followUpData, error: followUpError } = await supabase
+        .from('customer_follow_ups')
+        .select('id')
+        .eq('customer_id', customer.id)
+        .limit(1);
+
+      if (followUpError) {
+        console.error('查询跟进记录失败:', followUpError);
+        return '待跟进';
+      }
+
+      // 如果有跟进记录但没有成交，状态为"跟进中"
+      if (followUpData && followUpData.length > 0) {
+        return '跟进中';
+      }
+
+      // 既没有跟进记录也没有成交记录，状态为"待跟进"
+      return '待跟进';
+    } catch (error) {
+      console.error('计算客户状态失败:', error);
+      return '待跟进';
+    }
+  };
+
   // 初始化加载客户数据
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -164,7 +231,20 @@ export default function CustomerManagement() {
         // 从 Supabase 获取所有客户数据
         const customers = await supabaseService.getCustomers();
         console.log('原始客户数据数量:', customers.length);
-        setAllCustomers(customers);
+        
+        // 为每个客户自动计算状态
+        const customersWithStatus = await Promise.all(
+          customers.map(async (customer) => {
+            const calculatedStatus = await calculateCustomerStatus(customer);
+            return {
+              ...customer,
+              follow_up_status: calculatedStatus
+            };
+          })
+        );
+        
+        console.log('客户数据（含自动状态）:', customersWithStatus.length);
+        setAllCustomers(customersWithStatus);
       } catch (error) {
         console.error('获取客户数据失败', error);
       } finally {
@@ -197,7 +277,7 @@ export default function CustomerManagement() {
 
     // 应用状态筛选
     if (selectedStatus !== '全部') {
-      filtered = filtered.filter(customer => customer.status === selectedStatus);
+      filtered = filtered.filter(customer => customer.follow_up_status === selectedStatus);
     }
 
     // 应用区域筛选
@@ -447,7 +527,7 @@ export default function CustomerManagement() {
         .insert({
           customer_id: selectedCustomer.id.toString(),
           content: followUpContent,
-          created_by: user?.name,
+          created_by: user?.id,  // 修复：应该使用 user?.id (UUID) 而不是 user?.name
           created_at: new Date().toISOString()
         } as any);
 
@@ -461,6 +541,9 @@ export default function CustomerManagement() {
       if (selectedCustomer.id) {
         await loadFollowUpRecords(selectedCustomer.id.toString());
       }
+      
+      // 重新加载客户数据以更新状态
+      await reloadCustomers();
     } catch (error) {
       console.error('添加跟进记录失败:', error);
       toast.error('添加跟进记录失败');
@@ -541,8 +624,8 @@ export default function CustomerManagement() {
       console.log('更新客户数据:', dbUpdates);
       const updatedCustomer = await supabaseService.updateCustomer(selectedCustomer.id, dbUpdates);
       if (updatedCustomer) {
-        // 更新 allCustomers
-        setAllCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? updatedCustomer : c));
+        // 重新加载客户数据以更新状态
+        await reloadCustomers();
         
         // 同时更新 filteredCustomers，立即显示更新
         const frontendCustomer = convertToFrontend(updatedCustomer);
@@ -570,9 +653,10 @@ export default function CustomerManagement() {
       toast.dismiss(toastId);
       
       if (result.success > 0) {
-        toast.success(`成功导入 ${result.success} 位客户`);
-        const customers = await supabaseService.getCustomers();
-        setAllCustomers(customers);
+        console.log('添加客户成功：', data);
+
+      // 重新加载客户列表（并计算状态）
+      await reloadCustomers();
       }
       if (result.failed > 0) {
         toast.error(`${result.failed} 位客户导入失败`);
@@ -709,7 +793,7 @@ export default function CustomerManagement() {
           );
         }
         if (selectedStatus !== '全部') {
-          newFiltered = newFiltered.filter(c => c.status === selectedStatus);
+          newFiltered = newFiltered.filter(c => c.follow_up_status === selectedStatus);
         }
         if (selectedArea !== '全部') {
           newFiltered = newFiltered.filter(c => c.location === selectedArea);
@@ -764,8 +848,9 @@ export default function CustomerManagement() {
 
   // 计算统计数据
   const totalCustomers = filteredCustomers.length;
-  const convertedCustomers = filteredCustomers.filter(customer => customer.status === '已成交').length;
-  const followUpCustomers = filteredCustomers.filter(customer => customer.followUpStatus === '待跟进' || customer.followUpStatus === '进行中').length;
+  const pendingFollowUp = filteredCustomers.filter(customer => customer.followUpStatus === '待跟进').length;
+  const inProgress = filteredCustomers.filter(customer => customer.followUpStatus === '跟进中').length;
+  const converted = filteredCustomers.filter(customer => customer.followUpStatus === '已成交').length;
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -965,18 +1050,6 @@ export default function CustomerManagement() {
                           <option value="女">女</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">跟进状态</label>
-                        <select
-                          value={editCustomerData.followUpStatus || ''}
-                          onChange={(e) => setEditCustomerData({ ...editCustomerData, followUpStatus: e.target.value })}
-                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        >
-                          <option value="已完成">已完成</option>
-                          <option value="进行中">进行中</option>
-                          <option value="待跟进">待跟进</option>
-                        </select>
-                      </div>
                       {user?.role === 'admin' && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">负责业务员</label>
@@ -1059,8 +1132,8 @@ export default function CustomerManagement() {
 
         {/* 页面内容 */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 dark:bg-gray-900">
-          {/* 统计卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* 统计卡片 - 4个数据并排显示 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700"
@@ -1082,11 +1155,11 @@ export default function CustomerManagement() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">已成交客户</p>
-                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{convertedCustomers}</h3>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">待跟进</p>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{pendingFollowUp}</h3>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-600 dark:text-green-400">
-                  <DollarSign size={24} />
+                <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/50 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+                  <Clock size={24} />
                 </div>
               </div>
             </motion.div>
@@ -1097,11 +1170,26 @@ export default function CustomerManagement() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">待跟进客户</p>
-                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{followUpCustomers}</h3>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">跟进中</p>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{inProgress}</h3>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/50 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
-                  <Clock size={24} />
+                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <UserCircle size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ y: -5 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-gray-700"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">已成交</p>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{converted}</h3>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-600 dark:text-green-400">
+                  <DollarSign size={24} />
                 </div>
               </div>
             </motion.div>
@@ -1232,9 +1320,9 @@ export default function CustomerManagement() {
                   className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none"
                 >
                   <option value="全部">筛选状态</option>
-                  <option value="已成交">已成交</option>
+                  <option value="待跟进">待跟进</option>
                   <option value="跟进中">跟进中</option>
-                  <option value="潜在客户">潜在客户</option>
+                  <option value="已成交">已成交</option>
                 </select>
 
                 {/* 区域筛选 */}
@@ -1431,12 +1519,13 @@ export default function CustomerManagement() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${customer.followUpStatus === '已完成'
-                            ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
-                            : customer.followUpStatus === '待跟进'
-                              ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
-                              : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
-                            }`}>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            customer.followUpStatus === '已成交'
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                              : customer.followUpStatus === '跟进中'
+                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                                : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
+                          }`}>
                             {customer.followUpStatus}
                           </span>
                         </td>
@@ -1453,7 +1542,7 @@ export default function CustomerManagement() {
                           >
                             详情
                           </button>
-                          {user?.role === 'admin' || user?.name === customer.salesperson ? (
+                          {user?.role === 'admin' || user?.id === customer.salesperson_id ? (
                             <>
                               <PermissionGuard permission="customer_edit">
                                 <button
@@ -1617,12 +1706,13 @@ export default function CustomerManagement() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div className="flex items-center">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${selectedCustomer.followUpStatus === '已完成'
-                        ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
-                        : selectedCustomer.followUpStatus === '待跟进'
-                          ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
-                          : 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
-                        }`}>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        selectedCustomer.followUpStatus === '已成交'
+                          ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
+                          : selectedCustomer.followUpStatus === '跟进中'
+                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                            : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300'
+                      }`}>
                         {selectedCustomer.followUpStatus}
                       </span>
                     </div>

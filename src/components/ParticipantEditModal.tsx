@@ -30,13 +30,29 @@ const ParticipantEditModal: React.FC<ParticipantEditModalProps> = ({
 
   // 初始化表单数据
   useEffect(() => {
-    if (participant) {
-      setActualPrice((participant as any).actual_price || (participant as any).payment_amount || 0);
-      setDiscountRate((participant as any).discount_rate || 0);
-      setParticipationMode((participant as any).participation_mode || 'offline');
-      setPaymentStatus(participant.payment_status || '未支付');
+    if (participant && isOpen) {
+      // 保留现有数据，不要清零
+      // 注意：前端使用驼峰命名，数据库使用下划线命名，需要同时兼容
+      const price = (participant as any).actualPrice || (participant as any).actual_price || (participant as any).paymentAmount || (participant as any).payment_amount || 0;
+      const discount = (participant as any).discountRate || (participant as any).discount_rate || 0;
+      const mode = (participant as any).participationMode || (participant as any).participation_mode || 'offline';
+      const status = (participant as any).paymentStatus || participant.payment_status || '未支付';
+      
+      console.log('🔍 模态框初始化数据:', {
+        participant,
+        price,
+        discount,
+        mode,
+        status
+      });
+      
+      setActualPrice(price);
+      setDiscountRate(discount);
+      setParticipationMode(mode);
+      setPaymentStatus(status);
+      setRemark(''); // 每次打开清空备注
     }
-  }, [participant]);
+  }, [participant, isOpen]);
 
   // 计算标准价格
   const getStandardPrice = () => {
@@ -52,12 +68,16 @@ const ParticipantEditModal: React.FC<ParticipantEditModalProps> = ({
     return standardPrice * (1 - discountRate / 100);
   };
 
-  // 当折扣率改变时，自动更新实收价格
+  // 当实收价格或参与方式改变时，自动计算折扣率
   useEffect(() => {
-    if (discountRate > 0) {
-      setActualPrice(calculateDiscountedPrice());
+    const standardPrice = getStandardPrice();
+    if (standardPrice > 0 && actualPrice > 0) {
+      const calculatedDiscount = Math.round((1 - actualPrice / standardPrice) * 100);
+      setDiscountRate(Math.max(0, Math.min(100, calculatedDiscount))); // 限制在0-100%之间
+    } else if (actualPrice === 0) {
+      setDiscountRate(0);
     }
-  }, [discountRate, participationMode, trainingSession]);
+  }, [actualPrice, participationMode, trainingSession]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,20 +229,20 @@ const ParticipantEditModal: React.FC<ParticipantEditModalProps> = ({
               </div>
             </div>
 
-            {/* 折扣率 */}
+            {/* 折扣率（只读显示，自动计算） */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                折扣率 (%)
+                折扣率 (%) <span className="text-xs text-gray-500">（自动计算）</span>
               </label>
               <input
                 type="number"
-                min="0"
-                max="100"
-                step="0.1"
                 value={discountRate}
-                onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-white cursor-not-allowed"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                根据标准价格和实收价格自动计算
+              </p>
             </div>
 
             {/* 实收价格 */}
@@ -240,7 +260,7 @@ const ParticipantEditModal: React.FC<ParticipantEditModalProps> = ({
                 required
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                可手动调整最终实收价格
+                修改实收价格后，折扣率会自动计算
               </p>
             </div>
 

@@ -434,9 +434,9 @@ class SupabaseService {
 
   /**
    * 获取培训场次列表
-   * @param salespersonName 可选，业务员姓名，用于过滤该业务员的客户
+   * @param salespersonId 可选，业务员ID（UUID），用于过滤该业务员的客户参与的培训
    */
-  async getTrainingSessions(salespersonName?: string): Promise<TrainingSessionFrontend[]> {
+  async getTrainingSessions(salespersonId?: string): Promise<TrainingSessionFrontend[]> {
     try {
       const { data, error } = await retryOperation(async () => {
         return await supabase
@@ -449,6 +449,22 @@ class SupabaseService {
       
       const sessions = (data || []) as TrainingSession[];
       
+      // 如果指定了业务员ID，先获取该业务员的客户ID列表
+      let salespersonCustomerIds: number[] = [];
+      if (salespersonId) {
+        try {
+          const { data: customers } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('salesperson_id', salespersonId);
+          
+          salespersonCustomerIds = (customers || []).map(c => c.id);
+          console.log(`📋 业务员 ${salespersonId} 的客户ID列表:`, salespersonCustomerIds);
+        } catch (e) {
+          console.warn('获取业务员客户列表失败:', e);
+        }
+      }
+      
       // 优化：一次性加载所有参与者数据
       const sessionIds = sessions.map(s => s.id);
       let allParticipants: any[] = [];
@@ -460,9 +476,9 @@ class SupabaseService {
             .select('*')
             .in('training_session_id', sessionIds);
           
-          // 如果指定了业务员，只加载该业务员的客户
-          if (salespersonName) {
-            query = query.eq('salesperson_name', salespersonName);
+          // 如果指定了业务员，只加载该业务员客户的参训记录
+          if (salespersonId && salespersonCustomerIds.length > 0) {
+            query = query.in('customer_id', salespersonCustomerIds);
           }
           
           const { data: participantsData } = await query;
@@ -489,6 +505,10 @@ class SupabaseService {
         return converted;
       });
       
+      // 注意：业务员应该能看到所有培训（用于给自己客户报名）
+      // 数据隔离通过 participantsList 只包含该业务员的客户来实现
+      // 不要在这里过滤培训列表，否则业务员无法报名新培训
+      
       return sessionsWithParticipants;
     } catch (error) {
       const supabaseError = handleSupabaseError(error);
@@ -500,9 +520,9 @@ class SupabaseService {
   /**
    * 根据 ID 获取培训场次
    * @param id 培训场次ID
-   * @param salespersonName 可选，业务员姓名，用于过滤该业务员的客户
+   * @param salespersonId 可选，业务员ID（UUID），用于过滤该业务员的客户（通常不需要过滤，业务员应该看到该培训的所有参训人）
    */
-  async getTrainingSessionById(id: number, salespersonName?: string): Promise<TrainingSessionFrontend | null> {
+  async getTrainingSessionById(id: number, salespersonId?: string): Promise<TrainingSessionFrontend | null> {
     try {
       const { data, error } = await supabase
         .from('training_sessions')
@@ -517,9 +537,9 @@ class SupabaseService {
       // 转换为前端格式
       const session = convertTrainingSession(data as TrainingSession);
       
-      // 加载参与者列表
+      // 加载参与者列表（不过滤，显示所有参训人）
       try {
-        const participants = await this.getTrainingParticipants(id, salespersonName);
+        const participants = await this.getTrainingParticipants(id);
         session.participantsList = participants;
       } catch (e) {
         console.warn('加载参与者列表失败:', e);
@@ -920,7 +940,7 @@ class SupabaseService {
   // ============================================
 
   /**
-   * 获取业务员列表
+   * 获取员工列表（不包含管理员和专家，专家有单独的管理模块）
    */
   async getSalespersons(): Promise<Salesperson[]> {
     try {
@@ -928,7 +948,7 @@ class SupabaseService {
         return await supabase
           .from('user_profiles')
           .select('*')
-          .in('role', ['salesperson', 'manager']) // 包含业务员和部门经理
+          .in('role', ['salesperson', 'manager', 'conference_service']) // 不包含专家
           .order('created_at', { ascending: false });
       });
 
@@ -937,11 +957,15 @@ class SupabaseService {
       // 为没有position的用户根据role设置默认职位
       const dataWithPosition = (data || []).map(user => ({
         ...user,
-        position: user.position || (user.role === 'manager' ? '部门经理' : '销售')
+        position: user.position || (
+          user.role === 'manager' ? '部门经理' : 
+          user.role === 'conference_service' ? '会务客服' :
+          '业务员'
+        )
       }));
       
       console.log('🔧 getSalespersons 返回的数据:', dataWithPosition);
-      console.log('🔧 业务员数量:', dataWithPosition?.length || 0);
+      console.log('🔧 员工数量:', dataWithPosition?.length || 0);
       return dataWithPosition || [];
     } catch (error) {
       const supabaseError = handleSupabaseError(error);
@@ -1062,7 +1086,7 @@ class SupabaseService {
   }
 
   /**
-   * 更新业务员
+   * 更新员工信息（适用于所有员工角色）
    */
   async updateSalesperson(id: string, updates: Partial<Salesperson>): Promise<Salesperson> {
     try {
@@ -1070,7 +1094,7 @@ class SupabaseService {
         .from('user_profiles')
         .update(updates as any)
         .eq('id', id)
-        .eq('role', 'salesperson')
+        // 移除角色限制，允许更新所有员工角色（业务员、部门经理、专家、会务客服）
         .select()
         .single();
 

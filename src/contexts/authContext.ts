@@ -1,7 +1,7 @@
 import { createContext } from "react";
 
 // 用户角色类型
-export type UserRole = 'admin' | 'salesperson' | 'expert' | 'manager';
+export type UserRole = 'admin' | 'salesperson' | 'expert' | 'manager' | 'conference_service';
 
 // 用户信息接口
 export interface User {

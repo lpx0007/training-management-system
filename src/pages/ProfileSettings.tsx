@@ -303,7 +303,7 @@ export default function ProfileSettings() {
                 <div className="ml-6">
                   <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{user?.name}</h2>
                   <p className="text-gray-500 dark:text-gray-400">
-                    {user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : user?.role === 'manager' ? '部门经理' : '专家'}
+                    {user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : user?.role === 'manager' ? '部门经理' : user?.role === 'conference_service' ? '会务客服' : '专家'}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">点击头像可更换</p>
                 </div>
@@ -512,7 +512,7 @@ export default function ProfileSettings() {
                 <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
                   <span className="text-gray-500 dark:text-gray-400">角色</span>
                   <span className="text-gray-800 dark:text-white">
-                    {user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : user?.role === 'manager' ? '部门经理' : '专家'}
+                    {user?.role === 'admin' ? '管理员' : user?.role === 'salesperson' ? '业务员' : user?.role === 'manager' ? '部门经理' : user?.role === 'conference_service' ? '会务客服' : '专家'}
                   </span>
                 </div>
                 <div className="flex justify-between py-2">

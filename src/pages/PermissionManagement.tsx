@@ -20,7 +20,7 @@ import UserRoleEditModal from '@/components/UserRoleEditModal';
 interface UserWithPermissions {
   id: string;
   username: string;
-  role: 'admin' | 'salesperson' | 'expert' | 'manager';
+  role: 'admin' | 'salesperson' | 'expert' | 'manager' | 'conference_service';
   name: string;
   department: string | null;
   department_id?: number;
@@ -35,7 +35,7 @@ export default function PermissionManagement() {
   // 状态管理
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'all' | 'admin' | 'salesperson' | 'expert' | 'manager'>('all');
+  const [selectedRole, setSelectedRole] = useState<'all' | 'admin' | 'salesperson' | 'expert' | 'manager' | 'conference_service'>('all');
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserWithPermissions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +48,7 @@ export default function PermissionManagement() {
   
   // 角色批量设置状态
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-  const [selectedRoleForBatch, setSelectedRoleForBatch] = useState<'admin' | 'salesperson' | 'expert' | 'manager' | null>(null);
+  const [selectedRoleForBatch, setSelectedRoleForBatch] = useState<'salesperson' | 'expert' | 'manager' | 'conference_service' | null>(null);
   const [batchStrategy, setBatchStrategy] = useState<'override' | 'merge' | 'reset'>('merge');
   
   // 角色编辑状态
@@ -131,12 +131,12 @@ export default function PermissionManagement() {
   };
 
   // 打开角色批量设置模态框
-  const openRoleModal = (role: 'admin' | 'salesperson' | 'expert' | 'manager') => {
+  const openRoleModal = (role: 'salesperson' | 'expert' | 'manager' | 'conference_service') => {
     setSelectedRoleForBatch(role);
     
     // 加载该角色的默认权限和功能面板
-    const defaultPermissions = getRoleDefaultPermissions(role);
-    const defaultMenuFeatures = getRoleDefaultMenuFeatures(role);
+    const defaultPermissions = getRoleDefaultPermissions(role as any);
+    const defaultMenuFeatures = getRoleDefaultMenuFeatures(role as any);
     
     setSelectedPermissions(defaultPermissions);
     setSelectedMenuFeatures(defaultMenuFeatures);
@@ -263,7 +263,8 @@ export default function PermissionManagement() {
       admin: '管理员',
       salesperson: '业务员',
       expert: '专家',
-      manager: '部门经理'
+      manager: '部门经理',
+      conference_service: '会务客服'
     };
     return roleMap[role] || role;
   };
@@ -387,32 +388,6 @@ export default function PermissionManagement() {
               快速为某个角色的所有用户统一设置权限和功能面板访问权限
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* 管理员角色 */}
-              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-3">
-                      <Shield className="text-red-600 dark:text-red-400" size={20} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800 dark:text-white">管理员</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {users.filter(u => u.role === 'admin').length} 个用户
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  拥有系统所有权限，可以管理用户和系统配置
-                </p>
-                <button
-                  onClick={() => openRoleModal('admin')}
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                >
-                  批量设置
-                </button>
-              </div>
-
               {/* 业务员角色 */}
               <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
@@ -490,6 +465,32 @@ export default function PermissionManagement() {
                   批量设置
                 </button>
               </div>
+
+              {/* 会务客服角色 */}
+              <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mr-3">
+                      <UserCog className="text-orange-600 dark:text-orange-400" size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-800 dark:text-white">会务客服</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {users.filter(u => u.role === 'conference_service').length} 个用户
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  管理培训服务协调和参训人信息维护
+                </p>
+                <button
+                  onClick={() => openRoleModal('conference_service')}
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors"
+                >
+                  批量设置
+                </button>
+              </div>
             </div>
           </div>
 
@@ -517,6 +518,8 @@ export default function PermissionManagement() {
                   <option value="admin">管理员</option>
                   <option value="salesperson">业务员</option>
                   <option value="expert">专家</option>
+                  <option value="manager">部门经理</option>
+                  <option value="conference_service">会务客服</option>
                 </select>
               </div>
             </div>

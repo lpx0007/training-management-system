@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from 'react';
   import { AuthContext } from '@/contexts/authContext';
   import { useLocation } from 'react-router-dom';
-  import { Calendar, Filter, Search, ChevronDown, Users, MapPin, GraduationCap, Plus, ExternalLink, User, X, Download, Trash2, Phone, Mail, Briefcase, UserPlus, UserCircle, Menu } from 'lucide-react';
+  import { Calendar, Filter, Search, ChevronDown, Users, MapPin, GraduationCap, Plus, ExternalLink, Download, Trash2, Phone, Mail, Briefcase, UserPlus, UserCircle } from 'lucide-react';
   import { Empty } from '@/components/Empty';
   import Sidebar from '@/components/Sidebar';
   import NotificationBell from '@/components/Notifications/NotificationBell';
@@ -17,8 +17,7 @@ import { useState, useContext, useEffect } from 'react';
   import { toast } from 'sonner';
   import { exportAllAttendanceSheet, exportAttendanceSheetBySalesperson } from '@/lib/exporters/attendanceSheetExporter';
   import { generateDefaultAvatar } from '@/utils/imageUtils';
-  import { getStatusText, getStatusClassName, calculateTrainingStatus } from '@/utils/statusUtils';
-
+  
 export default function TrainingPerformance() {
   const location = useLocation();
   const { user } = useContext(AuthContext);
@@ -68,6 +67,11 @@ export default function TrainingPerformance() {
   const [selectedParticipantForEdit, setSelectedParticipantForEdit] = useState<any>(null);
   // 时间线视图状态
   const [timelineRange, setTimelineRange] = useState<'1month' | '3months' | '6months' | '1year' | 'all'>('3months');
+  // 是否显示已完成的课程
+  const [showCompleted, setShowCompleted] = useState(false);
+  // 业务员和会务客服列表
+  const [salespersonList, setSalespersonList] = useState<{id: string; name: string}[]>([]);
+  const [conferenceServiceList, setConferenceServiceList] = useState<{id: string; name: string}[]>([]);
 
   // 初始化数据
   useEffect(() => {
@@ -78,15 +82,17 @@ export default function TrainingPerformance() {
         // 获取当前用户信息
         const isAdmin = user?.role === 'admin';
         const isExpert = user?.role === 'expert';
-        const salespersonName = (isAdmin || isExpert) ? undefined : user?.name;
+        const isConferenceService = user?.role === 'conference_service';
+        const salespersonId = (isAdmin || isExpert || isConferenceService) ? undefined : user?.id;
         
-        console.log('👤 当前用户:', { role: user?.role, name: user?.name, isAdmin, isExpert });
+        console.log('👤 当前用户:', { role: user?.role, name: user?.name, id: user?.id, isAdmin, isExpert, isConferenceService });
         
         // 获取培训场次数据
         // 管理员：看到所有培训
-        // 业务员：只看到自己客户参与的培训
+        // 业务员：只看到自己客户参与的培训（通过customer_id关联）
         // 专家：只看到自己授课的培训
-        let trainingSessions = await supabaseService.getTrainingSessions(salespersonName);
+        // 会务客服：只看到分配给自己的培训
+        let trainingSessions = await supabaseService.getTrainingSessions(salespersonId);
         
         // 如果是专家，过滤出自己授课的培训
         if (isExpert && user?.name) {
@@ -94,6 +100,14 @@ export default function TrainingPerformance() {
             session.expert === user.name || session.expert.includes(user.name)
           );
           console.log('👨‍🏫 专家过滤后的培训:', trainingSessions);
+        }
+        
+        // 如果是会务客服，过滤出分配给自己的培训
+        if (isConferenceService && user?.id) {
+          trainingSessions = trainingSessions.filter(session => 
+            session.conferenceServiceId === user.id
+          );
+          console.log('🎯 会务客服过滤后的培训:', trainingSessions);
         }
         console.log('📊 获取到的培训场次数据:', trainingSessions);
         console.log('📅 第一条记录的 endDate:', trainingSessions[0]?.endDate);
@@ -147,6 +161,17 @@ export default function TrainingPerformance() {
         // 获取课表列表
         const scheduleList = await scheduleService.getSchedules();
         setSchedules(scheduleList);
+        
+        // 获取业务员列表（用于培训负责人选择）
+        if (isAdmin) {
+          const allUsers = await supabaseService.getAllUsersWithPermissions();
+          const salespersons = allUsers.filter((u: any) => u.role === 'salesperson' || u.role === 'manager');
+          setSalespersonList(salespersons.map((u: any) => ({ id: u.id, name: u.name })));
+          
+          // 获取会务客服列表
+          const conferenceServices = allUsers.filter((u: any) => u.role === 'conference_service');
+          setConferenceServiceList(conferenceServices.map((u: any) => ({ id: u.id, name: u.name })));
+        }
       } catch (error) {
         console.error('获取数据失败', error);
         toast.error('获取数据失败，请重试');
@@ -191,6 +216,25 @@ export default function TrainingPerformance() {
     
     // 使用所有会话数据的副本进行筛选，避免依赖循环
     let result = [...allSessions];
+    
+    // 默认过滤掉已完成的课程（通过结束日期判断）
+    if (!showCompleted) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // 设置为当天开始
+      
+      result = result.filter(session => {
+        // 如果有结束日期，使用结束日期判断
+        if (session.endDate) {
+          const endDate = new Date(session.endDate);
+          endDate.setHours(23, 59, 59, 999); // 设置为当天结束
+          return endDate >= now; // 结束日期 >= 今天，表示未完成
+        }
+        // 如果没有结束日期，使用开始日期判断
+        const startDate = new Date(session.date);
+        startDate.setHours(23, 59, 59, 999);
+        return startDate >= now; // 开始日期 >= 今天，表示未完成
+      });
+    }
     
     // 搜索筛选
     if (searchTerm) {
@@ -251,7 +295,7 @@ export default function TrainingPerformance() {
     }
     
     setFilteredSessions(result);
-  }, [allSessions, searchTerm, selectedExpert, selectedArea, selectedStatus, dateRange, sortConfig, isLoading, courses]);
+  }, [allSessions, searchTerm, selectedExpert, selectedArea, selectedStatus, dateRange, sortConfig, isLoading, courses, showCompleted]);
 
   // 处理排序
   const handleSort = (key: string) => {
@@ -307,10 +351,9 @@ export default function TrainingPerformance() {
         return;
       }
       
-      // 管理员和业务员需要获取完整的培训信息，包括参与者列表
-      const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
-      console.log('📡 正在获取完整培训信息...', { salespersonName });
-      const fullSession = await supabaseService.getTrainingSessionById(session.id, salespersonName);
+      // 获取完整的培训信息，包括参与者列表（不过滤，业务员应该看到所有参训人）
+      console.log('📡 正在获取完整培训信息...');
+      const fullSession = await supabaseService.getTrainingSessionById(session.id);
       console.log('✅ 获取到完整培训信息:', fullSession);
       if (fullSession) {
         setSelectedSession(fullSession);
@@ -473,13 +516,13 @@ export default function TrainingPerformance() {
 
   // 刷新数据
   const refreshData = async () => {
-    const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
-    const sessions = await supabaseService.getTrainingSessions(salespersonName);
+    const salespersonId = user?.role === 'salesperson' ? user.id : undefined;
+    const sessions = await supabaseService.getTrainingSessions(salespersonId);
     setAllSessions(sessions);
     
     // 如果详情模态框是打开的，也刷新详情
     if (selectedSession) {
-      const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id, salespersonName);
+      const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id);
       if (updatedSession) {
         setSelectedSession(updatedSession);
       }
@@ -634,8 +677,7 @@ export default function TrainingPerformance() {
       if (selectedSession) {
         try {
           // 重新获取培训详情以更新参训人员列表
-          const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
-          const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id, salespersonName);
+          const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id);
           if (updatedSession) {
             setSelectedSession(updatedSession);
           }
@@ -661,8 +703,7 @@ export default function TrainingPerformance() {
     // 刷新培训详情
     if (selectedSession) {
       try {
-        const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
-        const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id, salespersonName);
+        const updatedSession = await supabaseService.getTrainingSessionById(selectedSession.id);
         if (updatedSession) {
           setSelectedSession(updatedSession);
         }
@@ -782,8 +823,8 @@ export default function TrainingPerformance() {
       // 客户详细信息表头
       const headers = [
         '序号', '客户姓名', '手机号', '邮箱', '所在地区', '公司名称', '职位', 
-        '部门', '性别', '住宿需求', '客户标签', '跟进状态', '负责业务员',
-        '报名日期', '付款状态', '参与方式', '标准价格', '实付价格', '折扣率'
+        '部门', '性别', '住宿需求', '负责业务员', '报名日期', '付款状态', 
+        '参与方式', '标准价格', '实付价格', '折扣率'
       ];
 
       // 客户详细数据
@@ -801,8 +842,6 @@ export default function TrainingPerformance() {
           customer?.department || '',
           customer?.gender || '',
           customer?.accommodation_requirements || '',
-          Array.isArray(customer?.tags) ? customer.tags.join(', ') : (customer?.tags || ''),
-          customer?.follow_up_status || '',
           customer?.salesperson_name || participant.salespersonName || '未分配',
           participant.registrationDate ? new Date(participant.registrationDate).toLocaleDateString('zh-CN') : '',
           participant.paymentStatus || '',
@@ -904,8 +943,9 @@ export default function TrainingPerformance() {
       // 刷新培训列表
       const isAdmin = user?.role === 'admin';
       const isExpert = user?.role === 'expert';
-      const salespersonName = (isAdmin || isExpert) ? undefined : user?.name;
-      let trainingSessions = await supabaseService.getTrainingSessions(salespersonName);
+      const isConferenceService = user?.role === 'conference_service';
+      const salespersonId = (isAdmin || isExpert || isConferenceService) ? undefined : user?.id;
+      let trainingSessions = await supabaseService.getTrainingSessions(salespersonId);
       if (isExpert && user?.name) {
         trainingSessions = trainingSessions.filter(session => 
           session.expert === user.name || session.expert.includes(user.name)
@@ -962,9 +1002,9 @@ export default function TrainingPerformance() {
 
       // 批量更新折扣率
       for (const update of updates) {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await (supabase as any)
           .from('training_participants')
-          .update({ discount_rate: update.discount_rate } as any)
+          .update({ discount_rate: update.discount_rate })
           .eq('id', update.id);
 
         if (updateError) {
@@ -996,6 +1036,7 @@ export default function TrainingPerformance() {
       const area = formData.get('area') as string;
       const detailedAddress = formData.get('detailedAddress') as string;
       const salespersonId = formData.get('salespersonId') as string;
+      const conferenceServiceId = formData.get('conferenceServiceId') as string;
       
       // 根据日期自动计算状态
       const status = calculateTrainingStatus(startDate, endDate);
@@ -1076,6 +1117,14 @@ export default function TrainingPerformance() {
         return;
       }
 
+      // 获取负责人和会务客服的姓名
+      const editSalespersonName = salespersonId 
+        ? salespersonList.find(sp => sp.id === salespersonId)?.name || null
+        : null;
+      const editConferenceServiceName = conferenceServiceId
+        ? conferenceServiceList.find(cs => cs.id === conferenceServiceId)?.name || null
+        : null;
+
       // 准备更新数据
       const updateData = {
         name: courseName,  // 直接使用课程名称，不添加日期后缀
@@ -1090,6 +1139,9 @@ export default function TrainingPerformance() {
         course_id: null,
         course_description: courseDescription || null,
         salesperson_id: salespersonId || null,
+        salesperson_name: editSalespersonName,
+        conference_service_id: conferenceServiceId || null,
+        conference_service_name: editConferenceServiceName,
         prospectus_id: prospectusId ? parseInt(prospectusId) : null,
         schedule_id: editSession.scheduleId || null, // 保持原有的课表关联
         training_mode: trainingMode,
@@ -1162,6 +1214,8 @@ export default function TrainingPerformance() {
       const trainingMode = formData.get('trainingMode') as string;
       const onlinePrice = parseFloat(formData.get('onlinePrice') as string) || 0;
       const offlinePrice = parseFloat(formData.get('offlinePrice') as string) || 0;
+      const salespersonId = formData.get('salespersonId') as string;
+      const conferenceServiceId = formData.get('conferenceServiceId') as string;
       
       // 验证必填字段
       if (!name || !startDate || !endDate || !expertId) {
@@ -1217,6 +1271,14 @@ export default function TrainingPerformance() {
       // 根据开始日期和结束日期自动计算状态
       const status = calculateTrainingStatus(startDate, endDate);
       
+      // 获取负责人和会务客服的姓名
+      const assignedSalespersonName = salespersonId 
+        ? salespersonList.find(sp => sp.id === salespersonId)?.name || null
+        : user?.name || null;
+      const assignedConferenceServiceName = conferenceServiceId
+        ? conferenceServiceList.find(cs => cs.id === conferenceServiceId)?.name || null
+        : null;
+      
       console.log('准备添加培训:', {
         name,
         date: startDate,
@@ -1225,7 +1287,8 @@ export default function TrainingPerformance() {
         expert_name: expert.name,
         area: area || null,
         status,
-        salesperson_name: user?.name || null
+        salesperson_name: assignedSalespersonName,
+        conference_service_name: assignedConferenceServiceName
       });
       
       // 调用 API 添加培训
@@ -1242,8 +1305,10 @@ export default function TrainingPerformance() {
         revenue: null,
         status: status,
         rating: null,
-        salesperson_id: null,
-        salesperson_name: user?.name || null,
+        salesperson_id: salespersonId || null,
+        salesperson_name: assignedSalespersonName,
+        conference_service_id: conferenceServiceId || null,
+        conference_service_name: assignedConferenceServiceName,
         course_id: null,
         course_name: null,      // 新增字段
         session_number: 1,      // 新增字段，默认第1期
@@ -1265,8 +1330,8 @@ export default function TrainingPerformance() {
       closeModal();
       
       // 刷新数据（业务员只加载自己的客户）
-      const salespersonName = user?.role === 'salesperson' ? user.name : undefined;
-      const sessions = await supabaseService.getTrainingSessions(salespersonName);
+      const filterName = user?.role === 'salesperson' ? user.name : undefined;
+      const sessions = await supabaseService.getTrainingSessions(filterName);
       setAllSessions(sessions);
     } catch (error: any) {
       console.error('添加培训失败:', error);
@@ -1332,22 +1397,16 @@ export default function TrainingPerformance() {
     return allSessions
       .filter(session => {
         const sessionDate = new Date(session.date);
-        return sessionDate >= startDate && sessionDate <= endDate;
+        const sessionEndDate = new Date(session.endDate || session.date);
+        sessionEndDate.setHours(23, 59, 59, 999); // 设置为当天结束时刻
+        
+        // 只要培训还没结束（结束日期 >= 今天），并且开始日期在范围内，就显示
+        return sessionEndDate >= startDate && sessionDate <= endDate;
       })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 20); // 最多显示20个，避免过长
   };
 
-  const getAreaColor = (area: string) => {
-    const colors: { [key: string]: string } = {
-      '上海': 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700',
-      '广州': 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700',
-      '杭州': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700',
-      '深圳': 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700',
-      '北京': 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700',
-    };
-    return colors[area] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-600';
-  };
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -1657,6 +1716,20 @@ export default function TrainingPerformance() {
                   筛选
                   <ChevronDown size={16} className="ml-1" />
                 </button>
+                
+                {/* 显示已完成课程按钮 */}
+                <button
+                  onClick={() => setShowCompleted(!showCompleted)}
+                  className={`px-4 py-2 rounded-lg border transition-all flex items-center ${
+                    showCompleted 
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                  title={showCompleted ? '已显示所有课程（包括已完成）' : '仅显示未完成课程'}
+                >
+                  <Calendar size={16} className="mr-2" />
+                  {showCompleted ? '显示全部' : '显示已完成'}
+                </button>
               </div>
             </div>
             
@@ -1720,7 +1793,7 @@ export default function TrainingPerformance() {
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                         onClick={() => handleSort('name')}
                       >
                         <div className="flex items-center">
@@ -1732,7 +1805,7 @@ export default function TrainingPerformance() {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                         onClick={() => handleSort('date')}
                       >
                         <div className="flex items-center">
@@ -1744,7 +1817,7 @@ export default function TrainingPerformance() {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                         onClick={() => handleSort('participants')}
                       >
                         <div className="flex items-center">
@@ -1756,7 +1829,7 @@ export default function TrainingPerformance() {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
                           收费标准
@@ -1764,7 +1837,7 @@ export default function TrainingPerformance() {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                         onClick={() => handleSort('area')}
                       >
                         <div className="flex items-center">
@@ -1776,13 +1849,19 @@ export default function TrainingPerformance() {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
                         负责人
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                      >
+                        会务客服
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                       >
                         状态
                       </th>
@@ -1800,26 +1879,34 @@ export default function TrainingPerformance() {
                         key={session.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
                               <GraduationCap size={20} />
                             </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-800 dark:text-white">{session.name}</div>
+                            <div className="ml-3 max-w-[11rem]">
+                              <div className="text-sm font-medium text-gray-800 dark:text-white leading-snug whitespace-normal break-words">
+                                {session.name}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                          <div className="flex items-center">
-                            <Calendar size={14} className="mr-2 text-gray-400" />
-                            <span>{session.date}</span>
-                            {session.endDate && session.endDate !== session.date && (
-                              <span className="mx-1 text-blue-600 font-medium">至 {session.endDate}</span>
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                          <div className="flex flex-col leading-tight text-sm">
+                            <div className="flex items-center">
+                              <Calendar size={14} className="mr-2 text-gray-400" />
+                              <span>{session.date}</span>
+                            </div>
+                            {session.endDate && session.endDate !== session.date ? (
+                              <div className="pl-6 text-blue-600 font-medium">
+                                至 {session.endDate}
+                              </div>
+                            ) : (
+                              <div className="pl-6 text-gray-400">单日</div>
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                           <div className="flex items-center">
                             <Users size={14} className="mr-2 text-gray-400" />
                             {/* 专家显示容纳人数，业务员显示自己客户的参训人数，管理员显示总人数 */}
@@ -1831,7 +1918,7 @@ export default function TrainingPerformance() {
                             }
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm">
                           <div className="flex flex-col space-y-1">
                             {/* 培训模式 */}
                             <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full w-fit ${
@@ -1855,16 +1942,19 @@ export default function TrainingPerformance() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                           <div className="flex items-center">
                             <MapPin size={14} className="mr-2 text-gray-400" />
                             {session.area}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                           {session.salespersonName || '未分配'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                          {session.conferenceServiceName || '未分配'}
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
                           <div className="flex flex-col space-y-2">
                             {/* 时间状态 - 实时计算 */}
                             {(() => {
@@ -1947,7 +2037,7 @@ export default function TrainingPerformance() {
                                   className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3"
                                   onClick={() => handleAddCustomer(session.id)}
                                 >
-                                  添加团组/人
+                                  添加
                                 </button>
                               );
                             })()}
@@ -2181,6 +2271,36 @@ export default function TrainingPerformance() {
                        ))}
                      </select>
                    </div>
+                   
+                   {/* 负责人和会务客服 - 仅管理员可见 */}
+                   {user?.role === 'admin' && (
+                     <>
+                       <div>
+                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">负责人</label>
+                         <select
+                           name="salespersonId"
+                           className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                         >
+                           <option value="">未分配</option>
+                           {salespersonList.map(sp => (
+                             <option key={sp.id} value={sp.id}>{sp.name}</option>
+                           ))}
+                         </select>
+                       </div>
+                       <div>
+                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">会务客服</label>
+                         <select
+                           name="conferenceServiceId"
+                           className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                         >
+                           <option value="">未分配</option>
+                           {conferenceServiceList.map(cs => (
+                             <option key={cs.id} value={cs.id}>{cs.name}</option>
+                           ))}
+                         </select>
+                       </div>
+                     </>
+                   )}
                  </div>
 
                  {/* 提示信息 */}
@@ -2356,18 +2476,35 @@ export default function TrainingPerformance() {
                      />
                    </div>
                    {user?.role === 'admin' && (
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">负责人</label>
-                       <select
-                         name="salespersonId"
-                         defaultValue={editSession.salespersonId || ''}
-                         className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                       >
-                         <option value="">未分配</option>
-                         {/* 动态加载业务员列表 */}
-                       </select>
-                     </div>
-                   )}
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">负责人</label>
+                        <select
+                          name="salespersonId"
+                          defaultValue={editSession.salespersonId || ''}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        >
+                          <option value="">未分配</option>
+                          {salespersonList.map(sp => (
+                            <option key={sp.id} value={sp.id}>{sp.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">会务客服</label>
+                        <select
+                          name="conferenceServiceId"
+                          defaultValue={(editSession as any).conferenceServiceId || ''}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        >
+                          <option value="">未分配</option>
+                          {conferenceServiceList.map(cs => (
+                            <option key={cs.id} value={cs.id}>{cs.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
                  </div>
 
                  {/* 课程内容 - 全宽字段 */}
@@ -2595,6 +2732,10 @@ export default function TrainingPerformance() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600 dark:text-gray-400">负责人</span>
                           <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.salespersonName || '未分配'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">会务客服</span>
+                          <span className="text-sm font-medium text-gray-800 dark:text-white">{selectedSession.conferenceServiceName || '未分配'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-600 dark:text-gray-400">培训模式</span>
@@ -2879,9 +3020,7 @@ export default function TrainingPerformance() {
                             <tr>
                               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">姓名</th>
                               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">电话</th>
-                              {user?.role === 'admin' && (
-                                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">业务员</th>
-                              )}
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">业务员</th>
                               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">方式</th>
                               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">成交日期</th>
                               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">支付状态</th>
@@ -2929,9 +3068,7 @@ export default function TrainingPerformance() {
                                     </button>
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.phone}</td>
-                                  {user?.role === 'admin' && (
-                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.salespersonName || '未分配'}</td>
-                                  )}
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{participant.salespersonName || '未分配'}</td>
                                   <td className="px-4 py-2 whitespace-nowrap">
                                     <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full ${
                                       (participant as any).participationMode === 'online'
@@ -2981,6 +3118,15 @@ export default function TrainingPerformance() {
                                       ) : (
                                         <span className="text-gray-400 dark:text-gray-600 text-xs">无权限</span>
                                       )
+                                    ) : user?.role === 'conference_service' ? (
+                                      // 会务客服可以修改所有参训人
+                                      <button
+                                        onClick={() => handleEditParticipant(participant)}
+                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                                        title="修改参训信息"
+                                      >
+                                        修改
+                                      </button>
                                     ) : (
                                       // 业务员显示修改按钮（如果是自己的客户）
                                       participant.salespersonName === user?.name ? (
@@ -3021,7 +3167,7 @@ export default function TrainingPerformance() {
                         className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
                         onClick={() => handleAddCustomer(selectedSession.id)}
                       >
-                        添加团组/人
+                        添加
                       </button>
                     );
                   })()}
@@ -3573,11 +3719,11 @@ export default function TrainingPerformance() {
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{selectedCustomerDetail.name}</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {(selectedCustomerDetail.tags || []).map((tag, index) => (
-                      <span key={index} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-sm rounded-full">
-                        {tag}
+                    {selectedCustomerDetail.tags && (
+                      <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-sm rounded-full">
+                        {selectedCustomerDetail.tags}
                       </span>
-                    ))}
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
