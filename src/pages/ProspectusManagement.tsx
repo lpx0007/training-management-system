@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
+import { AuthContext } from '@/contexts/authContext';
 import { 
   FileText, 
   Search, 
@@ -22,6 +23,7 @@ import type { Prospectus } from '@/lib/supabase/types';
 import { getStatusText, getStatusClassName, calculateTrainingStatus } from '@/utils/statusUtils';
 
 export default function ProspectusManagement() {
+  const { user } = useContext(AuthContext);
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,6 +133,21 @@ export default function ProspectusManagement() {
     if (status === 'inactive') return '停用';
     if (status === 'error') return '异常';
     return status;
+  };
+
+  // 判断是否可以编辑/删除简章
+  const canEdit = (prospectus: Prospectus): boolean => {
+    // 管理员可以编辑所有
+    if (user?.role === 'admin') return true;
+    
+    // 会务客服如果有编辑权限，可以编辑所有简章
+    if (user?.role === 'conference_service') {
+      // 检查是否有 prospectus_edit 权限
+      return user?.permissions?.includes('prospectus_edit') || false;
+    }
+    
+    // 其他角色不能编辑
+    return false;
   };
 
   // 打开上传模态框
@@ -427,7 +444,8 @@ export default function ProspectusManagement() {
                           {getStatusBadge(prospectus.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <PermissionGuard permission="prospectus_edit">
+                          {/* 编辑按钮 - 管理员或自己上传的简章 */}
+                          {canEdit(prospectus) && (
                             <button 
                               onClick={() => openEditModal(prospectus)}
                               className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3"
@@ -435,8 +453,9 @@ export default function ProspectusManagement() {
                             >
                               <Edit size={16} />
                             </button>
-                          </PermissionGuard>
-                          <PermissionGuard permission="prospectus_edit">
+                          )}
+                          {/* 适配课程按钮 - 仅管理员 */}
+                          {user?.role === 'admin' && (
                             <button 
                               onClick={() => openAdaptCoursesModal(prospectus)}
                               className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3"
@@ -444,8 +463,9 @@ export default function ProspectusManagement() {
                             >
                               <i className="fas fa-link"></i>
                             </button>
-                          </PermissionGuard>
-                          <PermissionGuard permission="prospectus_delete">
+                          )}
+                          {/* 删除按钮 - 管理员或自己上传的简章 */}
+                          {canEdit(prospectus) && (
                             <button 
                               onClick={() => handleDelete(prospectus)}
                               className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
@@ -453,7 +473,7 @@ export default function ProspectusManagement() {
                             >
                               <Trash2 size={16} />
                             </button>
-                          </PermissionGuard>
+                          )}
                         </td>
                       </tr>
                     ))}

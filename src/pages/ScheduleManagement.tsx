@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '@/contexts/authContext';
 import { 
   Calendar, 
   Search, 
@@ -19,6 +20,7 @@ import scheduleService from '@/lib/supabase/scheduleService';
 import type { Schedule } from '@/lib/supabase/types';
 
 export default function ScheduleManagement() {
+  const { user } = useContext(AuthContext);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
@@ -95,6 +97,21 @@ export default function ScheduleManagement() {
   };
 
   // 上传课表
+  // 判断是否可以编辑/删除课表
+  const canEdit = (schedule: Schedule): boolean => {
+    // 管理员可以编辑所有
+    if (user?.role === 'admin') return true;
+    
+    // 会务客服如果有编辑权限，可以编辑所有课表
+    if (user?.role === 'conference_service') {
+      // 检查是否有 schedule_edit 权限
+      return user?.permissions?.includes('schedule_edit') || false;
+    }
+    
+    // 其他角色不能编辑
+    return false;
+  };
+
   const handleUpload = async (file: File, metadata: { name: string; type: string; description: string }) => {
     const loadingToast = toast.loading('正在上传课表...');
     try {
@@ -433,6 +450,7 @@ export default function ScheduleManagement() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end space-x-2">
+                              {/* 下载按钮 - 有下载权限即可 */}
                               <PermissionGuard permission="schedule_download">
                                 <button
                                   onClick={() => handleDownload(schedule)}
@@ -443,7 +461,8 @@ export default function ScheduleManagement() {
                                 </button>
                               </PermissionGuard>
                               
-                              <PermissionGuard permission="schedule_edit">
+                              {/* 编辑按钮 - 管理员或自己上传的课表 */}
+                              {canEdit(schedule) && (
                                 <button
                                   onClick={() => {
                                     setSelectedSchedule(schedule);
@@ -454,9 +473,10 @@ export default function ScheduleManagement() {
                                 >
                                   <Edit size={16} />
                                 </button>
-                              </PermissionGuard>
+                              )}
 
-                              <PermissionGuard permission="schedule_edit">
+                              {/* 关联课程按钮 - 仅管理员 */}
+                              {user?.role === 'admin' && (
                                 <button
                                   onClick={() => {
                                     setSelectedSchedule(schedule);
@@ -467,9 +487,10 @@ export default function ScheduleManagement() {
                                 >
                                   <BookOpen size={16} />
                                 </button>
-                              </PermissionGuard>
+                              )}
                               
-                              <PermissionGuard permission="schedule_delete">
+                              {/* 删除按钮 - 管理员或自己上传的课表 */}
+                              {canEdit(schedule) && (
                                 <button
                                   onClick={() => handleDelete(schedule)}
                                   className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 rounded"
@@ -477,7 +498,7 @@ export default function ScheduleManagement() {
                                 >
                                   <Trash2 size={16} />
                                 </button>
-                              </PermissionGuard>
+                              )}
                             </div>
                           </td>
                         </tr>

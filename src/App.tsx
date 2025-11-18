@@ -420,7 +420,7 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/training-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert', 'conference_service']}>
             <TrainingPerformance />
           </ProtectedRoute>
         } />
@@ -490,12 +490,12 @@ export default function App() {
           </ProtectedRoute>
         } />
         <Route path="/prospectus-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert', 'conference_service']}>
             <ProspectusManagement />
           </ProtectedRoute>
         } />
         <Route path="/schedule-management" element={
-          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert']}>
+          <ProtectedRoute requiredRole={['admin', 'salesperson', 'manager', 'expert', 'conference_service']}>
             <ScheduleManagement />
           </ProtectedRoute>
         } />
